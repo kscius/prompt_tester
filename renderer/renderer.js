@@ -4,8 +4,9 @@
 let savedPrompts    = [];
 let savedPanelOpen  = false;
 let isSending       = false;
-let lastRawText     = '';
+let lastRawText     = '';   // last response raw Markdown (for copy/export)
 let sessionCostUSD  = 0;
+let responseHistory = [];   // [{ model, temperature, text, meta }] – grows each send
 
 // ─── DOM references ──────────────────────────────────────────────────────────
 const modelSelect      = document.getElementById('model-select');
@@ -134,10 +135,27 @@ function renderSavedList() {
 function loadPreset(name) {
   const p = savedPrompts.find(x => x.name === name);
   if (!p) return;
-  promptInput.value  = p.prompt ?? '';
-  dataInput.value    = p.data   ?? '';
+  promptInput.value   = p.prompt ?? '';
+  dataInput.value     = p.data   ?? '';
   saveNameInput.value = name;
   updateCounts();
+
+  // Restore model and temperature if the preset stored them
+  if (p.model) {
+    const opt = modelSelect.querySelector(`option[value="${CSS.escape(p.model)}"]`);
+    if (opt) modelSelect.value = p.model;
+  }
+  if (p.temperature != null) {
+    tempRange.value     = p.temperature;
+    tempValue.textContent = parseFloat(p.temperature).toFixed(1);
+  }
+
+  // Restore response history saved with the preset
+  if (Array.isArray(p.responses) && p.responses.length) {
+    responseHistory = p.responses.slice();
+    renderHistory();
+  }
+
   toast(`Cargado: ${name}`);
 }
 
@@ -234,14 +252,29 @@ async function sendRequest() {
   sendLoading.classList.remove('hidden');
   sendBtn.disabled = true;
 
-  outputArea.innerHTML = `
+  // Show a loading placeholder at the bottom of the history
+  const placeholderId = `ph-${Date.now()}`;
+  const placeholder   = document.createElement('div');
+  placeholder.id        = placeholderId;
+  placeholder.className = 'history-entry history-entry--loading';
+  placeholder.innerHTML = `
+    <div class="history-entry-head">
+      <span class="history-badge history-badge--model">${esc(model)}</span>
+      <span class="history-badge history-badge--temp">temp ${temperature.toFixed(1)}</span>
+      <span class="history-ts">${fmtTime(new Date())}</span>
+    </div>
     <div class="loading-block">
-      <svg class="spin" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <svg class="spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
         <path d="M21 12a9 9 0 11-6.219-8.56"/>
       </svg>
-      Procesando con ${esc(model)}…
+      Procesando…
     </div>`;
-  outputMeta.classList.add('hidden');
+
+  // Remove empty-state placeholder if present
+  const empty = outputArea.querySelector('.output-empty');
+  if (empty) empty.remove();
+  outputArea.appendChild(placeholder);
+  placeholder.scrollIntoView({ behavior: 'smooth', block: 'end' });
 
   const startMs = Date.now();
 
@@ -249,10 +282,19 @@ async function sendRequest() {
     const result = await window.api.callGemini({ model, prompt, data, temperature });
     const elapsed = ((Date.now() - startMs) / 1000).toFixed(1);
 
+    placeholder.remove();
+
     if (result.ok) {
       lastRawText = result.text ?? '';
-      renderOutput(lastRawText);
 
+      // Build metadata for this response
+      const meta = { elapsed, usage: result.usage, cost: result.cost, finishReason: result.finishReason };
+
+      // Push to history and re-render
+      responseHistory.push({ model, temperature, text: lastRawText, meta, ts: new Date().toISOString() });
+      renderHistory();
+
+      // Update session-level footer meta
       if (result.usage) {
         const u = result.usage;
         tokenInfo.textContent  = `Tokens  entrada: ${u.promptTokenCount ?? '—'} · salida: ${u.candidatesTokenCount ?? '—'} · total: ${u.totalTokenCount ?? '—'}`;
@@ -270,11 +312,21 @@ async function sendRequest() {
 
         outputMeta.classList.remove('hidden');
       }
+
+      // Scroll last entry into view
+      outputArea.lastElementChild?.scrollIntoView({ behavior: 'smooth', block: 'end' });
     } else {
-      outputArea.innerHTML = `<div class="error-block">❌ Error: ${esc(result.error ?? 'Error desconocido')}</div>`;
+      const errEntry = document.createElement('div');
+      errEntry.className = 'history-entry history-entry--error';
+      errEntry.innerHTML = `<div class="error-block">❌ Error: ${esc(result.error ?? 'Error desconocido')}</div>`;
+      outputArea.appendChild(errEntry);
     }
   } catch (err) {
-    outputArea.innerHTML = `<div class="error-block">❌ Error inesperado: ${esc(err.message)}</div>`;
+    placeholder.remove();
+    const errEntry = document.createElement('div');
+    errEntry.className = 'history-entry history-entry--error';
+    errEntry.innerHTML = `<div class="error-block">❌ Error inesperado: ${esc(err.message)}</div>`;
+    outputArea.appendChild(errEntry);
   } finally {
     isSending = false;
     sendLabel.classList.remove('hidden');
@@ -283,23 +335,52 @@ async function sendRequest() {
   }
 }
 
-function renderOutput(text) {
-  if (!text) {
-    outputArea.innerHTML = '<div class="output-empty"><p>Respuesta vacía</p></div>';
-    return;
-  }
-
-  let html;
+// ─── History rendering ────────────────────────────────────────────────────────
+function mdToHtml(text) {
   try {
-    // marked is loaded from CDN – falls back to <pre> if unavailable
-    html = (window.marked && typeof window.marked.parse === 'function')
+    return (window.marked && typeof window.marked.parse === 'function')
       ? window.marked.parse(text)
       : `<pre style="white-space:pre-wrap;word-break:break-word">${esc(text)}</pre>`;
   } catch {
-    html = `<pre style="white-space:pre-wrap;word-break:break-word">${esc(text)}</pre>`;
+    return `<pre style="white-space:pre-wrap;word-break:break-word">${esc(text)}</pre>`;
+  }
+}
+
+function renderHistory() {
+  if (!responseHistory.length) {
+    outputArea.innerHTML = `
+      <div class="output-empty">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.3">
+          <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+        </svg>
+        <p>El resultado aparecerá aquí</p>
+        <p class="hint">Ctrl+Enter para enviar</p>
+      </div>`;
+    return;
   }
 
-  outputArea.innerHTML = `<div class="md-content">${html}</div>`;
+  outputArea.innerHTML = responseHistory.map((entry, idx) => {
+    const { model, temperature, text, meta, ts } = entry;
+    const costStr   = meta?.cost != null ? ` · 💰 ${fmtCost(meta.cost)}` : '';
+    const timeStr   = meta?.elapsed     ? ` · ⏱ ${meta.elapsed}s`        : '';
+    const tokenStr  = meta?.usage
+      ? ` · ${meta.usage.totalTokenCount ?? '—'} tokens`
+      : '';
+    const finStr    = meta?.finishReason ? ` · ${meta.finishReason}`      : '';
+    const dateStr   = ts ? fmtTime(new Date(ts)) : '';
+    const isLast    = idx === responseHistory.length - 1;
+
+    return `
+      <div class="history-entry${isLast ? ' history-entry--latest' : ''}">
+        <div class="history-entry-head">
+          <span class="history-badge history-badge--model">${esc(model)}</span>
+          <span class="history-badge history-badge--temp">temp ${parseFloat(temperature).toFixed(1)}</span>
+          <span class="history-entry-meta">${dateStr}${timeStr}${tokenStr}${costStr}${finStr}</span>
+          <span class="history-entry-num">#${idx + 1}</span>
+        </div>
+        <div class="md-content history-md">${mdToHtml(text)}</div>
+      </div>`;
+  }).join('<div class="history-separator" aria-hidden="true"></div>');
 }
 
 sendBtn.addEventListener('click', sendRequest);
@@ -314,30 +395,31 @@ document.addEventListener('keydown', e => {
 
 // ─── Output toolbar ───────────────────────────────────────────────────────────
 copyBtn.addEventListener('click', async () => {
-  if (!lastRawText) { toast('No hay contenido para copiar'); return; }
-  await navigator.clipboard.writeText(lastRawText);
-  toast('Copiado al portapapeles');
+  if (!responseHistory.length) { toast('No hay contenido para copiar'); return; }
+  // Copy all responses joined with a separator
+  const all = responseHistory
+    .map((e, i) => `## Respuesta #${i + 1} — ${e.model} (temp ${parseFloat(e.temperature).toFixed(1)})\n\n${e.text}`)
+    .join('\n\n---\n\n');
+  await navigator.clipboard.writeText(all);
+  toast('Historial copiado al portapapeles');
 });
 
 exportBtn.addEventListener('click', async () => {
-  if (!lastRawText) { toast('No hay contenido para exportar'); return; }
+  if (!responseHistory.length) { toast('No hay contenido para exportar'); return; }
+  const all = responseHistory
+    .map((e, i) => `## Respuesta #${i + 1} — ${e.model} (temp ${parseFloat(e.temperature).toFixed(1)})\n\n${e.text}`)
+    .join('\n\n---\n\n');
   const ts   = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-  const name = `resultado-${ts}.md`;
-  const res  = await window.api.saveOutputFile({ text: lastRawText, defaultName: name });
+  const name = `historial-${ts}.md`;
+  const res  = await window.api.saveOutputFile({ text: all, defaultName: name });
   if (res.ok)         toast(`Guardado: ${res.filePath.split(/[\\/]/).pop()}`);
   else if (res.error) toast(`Error: ${res.error}`);
 });
 
 clearOutputBtn.addEventListener('click', () => {
-  lastRawText = '';
-  outputArea.innerHTML = `
-    <div class="output-empty">
-      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.3">
-        <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
-      </svg>
-      <p>El resultado aparecerá aquí</p>
-      <p class="hint">Ctrl+Enter para enviar</p>
-    </div>`;
+  lastRawText     = '';
+  responseHistory = [];
+  renderHistory();
   costInfo.textContent = '';
   outputMeta.classList.add('hidden');
 });
@@ -347,7 +429,12 @@ clearAllBtn.addEventListener('click', () => {
   dataInput.value     = '';
   saveNameInput.value = '';
   updateCounts();
-  clearOutputBtn.click();
+  // Manually reset rather than triggering click so we avoid double resets
+  lastRawText     = '';
+  responseHistory = [];
+  renderHistory();
+  costInfo.textContent = '';
+  outputMeta.classList.add('hidden');
   toast('Limpiado');
 });
 
@@ -358,8 +445,11 @@ savePresetBtn.addEventListener('click', async () => {
 
   savedPrompts = await window.api.savePrompt({
     name,
-    prompt: promptInput.value,
-    data:   dataInput.value,
+    prompt:      promptInput.value,
+    data:        dataInput.value,
+    model:       modelSelect.value,
+    temperature: parseFloat(tempRange.value),
+    responses:   responseHistory.slice(),
   });
   renderSavedList();
   toast(`Guardado: ${name}`);
@@ -485,6 +575,15 @@ function fmtDate(iso) {
     return new Date(iso).toLocaleDateString('es-MX', {
       day: '2-digit', month: '2-digit', year: '2-digit',
     });
+  } catch {
+    return '';
+  }
+}
+
+function fmtTime(date) {
+  if (!date || isNaN(date)) return '';
+  try {
+    return date.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   } catch {
     return '';
   }

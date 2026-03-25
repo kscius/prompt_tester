@@ -248,10 +248,18 @@ ipcMain.handle('output:save-file', async (_, { text, defaultName }) => {
 
 ipcMain.handle('prompts:list', () => readJSON(getDataPath('saved-prompts.json')) ?? []);
 
-ipcMain.handle('prompts:save', (_, { name, prompt, data }) => {
+ipcMain.handle('prompts:save', (_, { name, prompt, data, model, temperature, responses }) => {
   const saved = readJSON(getDataPath('saved-prompts.json')) ?? [];
   const idx = saved.findIndex(p => p.name === name);
-  const entry = { name, prompt, data, updatedAt: new Date().toISOString() };
+  const entry = {
+    name,
+    prompt,
+    data,
+    model:       model       ?? null,
+    temperature: temperature ?? null,
+    responses:   Array.isArray(responses) ? responses : [],
+    updatedAt:   new Date().toISOString(),
+  };
   if (idx >= 0) saved[idx] = entry;
   else saved.push(entry);
   writeJSON(getDataPath('saved-prompts.json'), saved);
