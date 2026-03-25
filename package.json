@@ -1,0 +1,72 @@
+{
+  "name": "prompt-tester",
+  "version": "1.0.0",
+  "description": "Interactive LLM Prompt Tester for Gemini models",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --inspect",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder --win",
+    "dist:portable": "electron-builder --win portable",
+    "dist:mac": "electron-builder --mac",
+    "dist:linux": "electron-builder --linux"
+  },
+  "keywords": ["electron", "llm", "gemini", "prompt"],
+  "author": "Mitzael Serna",
+  "license": "MIT",
+  "dependencies": {
+    "google-auth-library": "^10.6.2"
+  },
+  "devDependencies": {
+    "electron": "^41.0.0",
+    "electron-builder": "^26.0.0"
+  },
+  "build": {
+    "appId": "com.mitzael.prompt-tester",
+    "productName": "Prompt Tester",
+    "copyright": "Copyright © Mitzael Serna",
+    "directories": {
+      "output": "release"
+    },
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "deleteAppDataOnUninstall": false,
+      "artifactName": "${productName}-Setup-${version}-${arch}.${ext}"
+    },
+    "portable": {
+      "artifactName": "${productName}-Portable-${version}-${arch}.${ext}"
+    },
+    "mac": {
+      "target": [
+        { "target": "dmg", "arch": ["x64", "arm64"] },
+        { "target": "zip", "arch": ["x64", "arm64"] }
+      ],
+      "category": "public.app-category.developer-tools",
+      "artifactName": "${productName}-${version}-${arch}-mac.${ext}"
+    },
+    "linux": {
+      "target": [
+        { "target": "AppImage", "arch": ["x64"] },
+        { "target": "deb", "arch": ["x64"] }
+      ],
+      "category": "Development",
+      "artifactName": "${productName}-${version}-${arch}-linux.${ext}"
+    }
+  }
+}
