@@ -2,6 +2,18 @@
 
 El formato sigue una idea cercana a [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
+## [1.1.0] - 2026-03-26
+
+### Añadido
+
+- Asistente de mejora de prompts: panel flotante independiente, botón en la barra del historial y FAB; usa el mismo modelo y credenciales; contexto con instrucción del sistema, datos, última respuesta del historial y temperaturas.
+- Documentación en `docs/PROMPT_ASSISTANT.md`.
+
+### Cambiado
+
+- Instrucción de sistema del coach (`PROMPT_COACH_SYSTEM`) y payload contextual ampliados para Gemini, truncado explícito y respuesta estructurada en español.
+- `README` actualizado con el asistente de prompt.
+
 ## [1.0.0] - 2026-03-25
 
 ### Añadido
@@ -17,4 +29,5 @@ El formato sigue una idea cercana a [Keep a Changelog](https://keepachangelog.co
 - Empaquetado con electron-builder: Windows (NSIS + portable), macOS (DMG + ZIP) y Linux (AppImage + deb).
 - Mitigaciones en Windows para conflictos de caché de Chromium y bloqueo de instancia única.
 
+[1.1.0]: https://github.com/kscius/prompt_tester/releases/tag/v1.1.0
 [1.0.0]: https://github.com/kscius/prompt_tester/releases/tag/v1.0.0

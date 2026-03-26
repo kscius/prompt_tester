@@ -517,6 +517,9 @@ document.addEventListener('keydown', e => {
     closeTempHelp();
     return;
   }
+  if (typeof window.__promptCoachHandleEscape === 'function' && window.__promptCoachHandleEscape()) {
+    return;
+  }
   closeCredsModal();
 });
 
@@ -599,4 +602,13 @@ function toast(msg) {
 }
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
+window.promptTester = {
+  responseHistory,
+  promptInput,
+  dataInput,
+  modelSelect,
+  tempRange,
+  toast,
+  openCredsModal,
+};
 init();

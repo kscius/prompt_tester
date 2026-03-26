@@ -88,7 +88,16 @@
     <!-- Right: output -->
     <div class="pane pane-output">
       <div class="output-toolbar">
-        <span class="block-label">Historial de respuestas</span>
+        <div class="output-toolbar-left">
+          <span class="block-label">Historial de respuestas</span>
+          <button type="button" id="coach-open-toolbar-btn" class="btn-coach-inline" title="Abrir asistente para mejorar el prompt">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z"/>
+              <path d="M5 19h14"/>
+            </svg>
+            Asistente
+          </button>
+        </div>
         <div class="toolbar-actions">
           <button id="copy-btn" class="icon-btn" title="Copiar texto">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
@@ -239,6 +248,39 @@
   <!-- Backdrop para cerrar la ayuda de temperatura al hacer clic fuera -->
   <div id="temp-help-backdrop" class="temp-help-backdrop hidden" aria-hidden="true"></div>
 
+  <!-- Asistente de mejora de prompts (panel flotante, independiente del chat principal) -->
+  <button type="button" id="coach-fab" class="coach-fab" aria-expanded="false" aria-controls="coach-panel" title="Asistente de prompt" aria-label="Abrir asistente de mejora de prompts">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z"/>
+      <path d="M5 19h14"/>
+    </svg>
+  </button>
+
+  <div id="coach-panel" class="coach-panel hidden" role="dialog" aria-modal="true" aria-labelledby="coach-panel-title">
+    <div class="coach-panel-header">
+      <h2 id="coach-panel-title" class="coach-panel-title">Asistente de prompt</h2>
+      <div class="coach-panel-actions">
+        <button type="button" id="coach-clear-btn" class="icon-btn" title="Limpiar conversación del asistente" aria-label="Limpiar conversación del asistente">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
+        </button>
+        <button type="button" id="coach-minimize-btn" class="icon-btn" title="Ocultar panel" aria-label="Ocultar panel">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+      </div>
+    </div>
+    <p class="coach-panel-desc">
+      Pide mejoras concretas sobre tu <strong>instrucción del sistema</strong>, los <strong>datos</strong> o la <strong>última respuesta</strong> del historial.
+      El asistente usa la temperatura actual del probador, el modelo seleccionado y <strong>temp. 0,35</strong> en sus propias respuestas para consejos más estables.
+    </p>
+    <div id="coach-messages" class="coach-messages" role="log" aria-live="polite" aria-relevant="additions"></div>
+    <div class="coach-compose">
+      <label for="coach-input" class="visually-hidden">Mensaje al asistente</label>
+      <textarea id="coach-input" class="coach-input" rows="2" placeholder="Ej.: Quiero acortar la parte final, o mejorar donde dice…" spellcheck="true"></textarea>
+      <button type="button" id="coach-send" class="btn btn-secondary coach-send-btn">Enviar</button>
+    </div>
+  </div>
+
   <script src="renderer.js"></script>
+  <script src="prompt-coach.js"></script>
 </body>
 </html>

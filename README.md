@@ -11,6 +11,7 @@ Aplicación de escritorio para probar modelos **Gemini** de Google con tus propi
 - Presets: guardar y cargar combinaciones de prompt + datos.
 - Temperatura ajustable (0–2) con una nota breve sobre qué hace cada rango.
 - Tras cada respuesta: tokens, tiempo, coste estimado (según tabla de precios en la app) y acumulado de la sesión.
+- **Asistente de prompt**: panel flotante (botón redondo y acceso desde el historial) que usa Gemini con tu instrucción del sistema, datos, última respuesta del historial y temperaturas para sugerir cambios concretos en el prompt.
 
 Los importes de coste son **orientativos**; comprueba siempre la facturación en Google Cloud / AI Studio.
 
