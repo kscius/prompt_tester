@@ -58,7 +58,7 @@ function writeJSON(filePath, data) {
 // ---------------------------------------------------------------------------
 
 const MODELS = [
-  { id: 'gemini-2.5-flash-lite-preview-09-2025', label: 'Gemini 2.5 Flash Lite Preview (09-2025)' },
+  { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite' },
   { id: 'gemini-2.5-flash',                       label: 'Gemini 2.5 Flash' },
   { id: 'gemini-2.0-flash-001',                   label: 'Gemini 2.0 Flash (001)' },
   { id: 'gemini-2.0-flash-lite-001',              label: 'Gemini 2.0 Flash Lite (001)' },
@@ -72,7 +72,7 @@ const MODELS = [
 // ---------------------------------------------------------------------------
 
 const MODEL_PRICING = {
-  'gemini-2.5-flash-lite-preview-09-2025': { inputPerM: 0.075,   outputPerM: 0.30  },
+  'gemini-2.5-flash-lite':                  { inputPerM: 0.075,   outputPerM: 0.30  },
   'gemini-2.5-flash':                       { inputPerM: 0.30,    outputPerM: 2.50  },
   'gemini-2.0-flash-001':                   { inputPerM: 0.075,   outputPerM: 0.30  },
   'gemini-2.0-flash-lite-001':              { inputPerM: 0.0375,  outputPerM: 0.15  },
