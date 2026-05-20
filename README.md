@@ -5,7 +5,7 @@ Aplicación de escritorio para probar modelos **Gemini** de Google con tus propi
 ## Qué incluye
 
 - Importación de credenciales tipo **service account** (JSON), guardadas solo en el almacenamiento local de la app.
-- Selector de modelo y llamada a la API de Generative Language (`generateContent`).
+- Selector de modelo (lista obtenida de la API Gemini según tus credenciales) y llamada a `generateContent`.
 - Dos áreas de texto: instrucción del sistema y datos del usuario.
 - Resultado renderizado en Markdown, copiar al portapapeles y exportar a `.md`.
 - Presets: guardar y cargar combinaciones de prompt + datos.

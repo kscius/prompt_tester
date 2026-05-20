@@ -54,17 +54,113 @@ function writeJSON(filePath, data) {
 }
 
 // ---------------------------------------------------------------------------
-// Available models
+// Available models (fetched from Gemini API; fallback when offline / no creds)
 // ---------------------------------------------------------------------------
 
-const MODELS = [
+const FALLBACK_MODELS = [
   { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite' },
-  { id: 'gemini-2.5-flash',                       label: 'Gemini 2.5 Flash' },
-  { id: 'gemini-2.0-flash-001',                   label: 'Gemini 2.0 Flash (001)' },
-  { id: 'gemini-2.0-flash-lite-001',              label: 'Gemini 2.0 Flash Lite (001)' },
-  { id: 'gemini-1.5-flash-002',                   label: 'Gemini 1.5 Flash (002)' },
-  { id: 'gemini-1.5-pro-002',                     label: 'Gemini 1.5 Pro (002)' },
+  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+  { id: 'gemini-2.0-flash-001', label: 'Gemini 2.0 Flash (001)' },
+  { id: 'gemini-2.0-flash-lite-001', label: 'Gemini 2.0 Flash Lite (001)' },
+  { id: 'gemini-1.5-flash-002', label: 'Gemini 1.5 Flash (002)' },
+  { id: 'gemini-1.5-pro-002', label: 'Gemini 1.5 Pro (002)' },
 ];
+
+let modelsCache = null;
+let modelsCacheKey = null;
+
+function invalidateModelsCache() {
+  modelsCache = null;
+  modelsCacheKey = null;
+}
+
+async function getGeminiAccessToken() {
+  const creds = readJSON(getDataPath('credentials.json'));
+  if (!creds) {
+    return { ok: false, error: 'Sin credenciales configuradas. Configúralas en el botón de credenciales.' };
+  }
+
+  const { GoogleAuth } = await import('google-auth-library');
+  const auth = new GoogleAuth({
+    credentials: creds,
+    scopes: [
+      'https://www.googleapis.com/auth/cloud-platform',
+      'https://www.googleapis.com/auth/generative-language',
+    ],
+  });
+
+  const client = await auth.getClient();
+  const tokenResult = await client.getAccessToken();
+  const accessToken = tokenResult.token;
+  if (!accessToken) {
+    return { ok: false, error: 'No se pudo obtener el token de acceso.' };
+  }
+
+  return { ok: true, token: accessToken, cacheKey: creds.client_email ?? creds.project_id ?? 'default' };
+}
+
+async function fetchAllApiModels(accessToken) {
+  const collected = [];
+  let pageToken;
+
+  do {
+    const url = new URL('https://generativelanguage.googleapis.com/v1beta/models');
+    url.searchParams.set('pageSize', '1000');
+    if (pageToken) url.searchParams.set('pageToken', pageToken);
+
+    const res = await fetch(url.toString(), {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (!res.ok) {
+      const errBody = await res.text();
+      throw new Error(`HTTP ${res.status}: ${errBody}`);
+    }
+
+    const json = await res.json();
+    if (Array.isArray(json.models)) collected.push(...json.models);
+    pageToken = json.nextPageToken;
+  } while (pageToken);
+
+  return collected;
+}
+
+function apiModelToOption(model) {
+  const id = (model.name || '').replace(/^models\//, '');
+  if (!id) return null;
+
+  const methods = model.supportedGenerationMethods ?? [];
+  if (!methods.includes('generateContent')) return null;
+
+  return {
+    id,
+    label: (model.displayName || id).trim(),
+  };
+}
+
+async function listAvailableModels() {
+  const auth = await getGeminiAccessToken();
+  if (!auth.ok) return FALLBACK_MODELS;
+
+  if (modelsCache && modelsCacheKey === auth.cacheKey) return modelsCache;
+
+  try {
+    const raw = await fetchAllApiModels(auth.token);
+    const models = raw
+      .map(apiModelToOption)
+      .filter(Boolean)
+      .sort((a, b) => a.label.localeCompare(b.label, 'es', { sensitivity: 'base' }));
+
+    if (models.length === 0) return FALLBACK_MODELS;
+
+    modelsCache = models;
+    modelsCacheKey = auth.cacheKey;
+    return models;
+  } catch (e) {
+    console.warn('[prompt-tester] No se pudieron listar modelos desde la API:', e.message);
+    return FALLBACK_MODELS;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Pricing (USD per 1M tokens – source: Google AI Studio pricing, Jan 2026)
@@ -120,6 +216,7 @@ ipcMain.handle('creds:clear', () => {
   try {
     const p = getDataPath('credentials.json');
     if (fs.existsSync(p)) fs.unlinkSync(p);
+    invalidateModelsCache();
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e.message };
@@ -140,6 +237,7 @@ function validateAndSaveCredentials(creds) {
     return { ok: false, error: 'No es un archivo de Service Account válido (falta "type":"service_account")' };
   }
   writeJSON(getDataPath('credentials.json'), creds);
+  invalidateModelsCache();
   return { ok: true, projectId: creds.project_id, clientEmail: creds.client_email };
 }
 
@@ -147,30 +245,18 @@ function validateAndSaveCredentials(creds) {
 // Models IPC
 // ---------------------------------------------------------------------------
 
-ipcMain.handle('models:list', () => MODELS);
+ipcMain.handle('models:list', () => listAvailableModels());
 
 // ---------------------------------------------------------------------------
 // Gemini API IPC
 // ---------------------------------------------------------------------------
 
 ipcMain.handle('gemini:call', async (_, { model, prompt, data, temperature }) => {
-  const creds = readJSON(getDataPath('credentials.json'));
-  if (!creds) return { ok: false, error: 'Sin credenciales configuradas. Configúralas en el botón de credenciales.' };
+  const auth = await getGeminiAccessToken();
+  if (!auth.ok) return { ok: false, error: auth.error };
 
   try {
-    // Dynamic import handles both CJS and ESM builds of google-auth-library
-    const { GoogleAuth } = await import('google-auth-library');
-    const auth = new GoogleAuth({
-      credentials: creds,
-      scopes: [
-        'https://www.googleapis.com/auth/cloud-platform',
-        'https://www.googleapis.com/auth/generative-language',
-      ],
-    });
-
-    const client = await auth.getClient();
-    const tokenResult = await client.getAccessToken();
-    const accessToken = tokenResult.token;
+    const accessToken = auth.token;
 
     const requestBody = {
       contents: [{ role: 'user', parts: [{ text: data || '' }] }],

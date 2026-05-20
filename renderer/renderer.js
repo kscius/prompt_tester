@@ -61,10 +61,14 @@ async function init() {
 }
 
 async function loadModels() {
+  const previous = modelSelect.value;
   const models = await window.api.getModels();
   modelSelect.innerHTML = models
     .map(m => `<option value="${esc(m.id)}">${esc(m.label)}</option>`)
     .join('');
+  if (previous && [...modelSelect.options].some(o => o.value === previous)) {
+    modelSelect.value = previous;
+  }
 }
 
 async function refreshCredsStatus() {
@@ -527,6 +531,7 @@ importFileBtn.addEventListener('click', async () => {
   const result = await window.api.selectCredsFile();
   if (result.ok) {
     applyCredsUI(result);
+    await loadModels();
     closeCredsModal();
     toast('Credenciales importadas correctamente');
   } else if (result.error) {
@@ -541,6 +546,7 @@ savePastedBtn.addEventListener('click', async () => {
   const result = await window.api.saveCredsJson(json);
   if (result.ok) {
     applyCredsUI(result);
+    await loadModels();
     closeCredsModal();
     toast('Credenciales guardadas');
   } else {
@@ -552,6 +558,7 @@ removeCreds.addEventListener('click', async () => {
   const result = await window.api.clearCreds();
   if (result.ok) {
     applyCredsUI({ ok: false });
+    await loadModels();
     toast('Credenciales eliminadas');
   }
 });

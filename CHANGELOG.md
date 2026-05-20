@@ -2,6 +2,12 @@
 
 El formato sigue una idea cercana a [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
+## [1.3.0] - 2026-05-20
+
+### Cambiado
+
+- El selector de modelos se rellena dinámicamente con todos los modelos de la API Gemini accesibles con tus credenciales (`generateContent`), en lugar de una lista fija.
+
 ## [1.1.0] - 2026-03-26
 
 ### Añadido
