@@ -44,6 +44,8 @@ Los artefactos se generan en la carpeta `release/` (está en `.gitignore`: no se
 | **macOS** | `npm run dist:mac` | Ejecutar en macOS. DMG y ZIP para x64 y arm64. Firma y notarización son opcionales pero recomendables para distribución. |
 | **Linux** (x64) | `npm run dist:linux` | AppImage y paquete `.deb`. Ejecutar en Linux o en CI con runner Linux. |
 
+**Release automática:** al hacer `git push origin v1.3.0` (tag `v*`), GitHub Actions compila las tres plataformas y adjunta los binarios en [Releases](https://github.com/kscius/prompt_tester/releases). Detalle en [docs/RELEASING.md](docs/RELEASING.md).
+
 Solo carpeta sin instalador (útil para pruebas):
 
 ```bash
