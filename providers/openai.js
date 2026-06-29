@@ -1,3 +1,5 @@
+const { formatHttpError } = require('./errors');
+
 const BASE_URL = 'https://api.openai.com/v1';
 
 const fallbackModels = [
@@ -71,7 +73,7 @@ async function generate(ctx, { model, prompt, data, temperature }) {
 
     if (!res.ok) {
       const errBody = await res.text();
-      return { ok: false, error: `HTTP ${res.status}: ${errBody}` };
+      return { ok: false, error: formatHttpError(res.status, errBody, 'openai') };
     }
 
     const json = await res.json();

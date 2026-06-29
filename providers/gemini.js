@@ -1,3 +1,5 @@
+const { formatHttpError } = require('./errors');
+
 const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 
 const fallbackModels = [
@@ -93,7 +95,7 @@ async function fetchAllApiModels(auth) {
 
     if (!res.ok) {
       const errBody = await res.text();
-      throw new Error(`HTTP ${res.status}: ${errBody}`);
+      throw new Error(formatHttpError(res.status, errBody, 'gemini'));
     }
 
     const json = await res.json();
@@ -175,7 +177,7 @@ async function generate(ctx, { model, prompt, data, temperature }) {
 
     if (!res.ok) {
       const errBody = await res.text();
-      return { ok: false, error: `HTTP ${res.status}: ${errBody}` };
+      return { ok: false, error: formatHttpError(res.status, errBody, 'gemini') };
     }
 
     const json = await res.json();
