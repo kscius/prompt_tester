@@ -7,13 +7,13 @@
     "start": "electron .",
     "dev": "electron . --inspect",
     "pack": "electron-builder --dir",
-    "dist": "electron-builder --win",
-    "dist:portable": "electron-builder --win portable",
-    "dist:mac": "electron-builder --mac",
-    "dist:linux": "electron-builder --linux"
+    "dist": "electron-builder --win --publish never",
+    "dist:portable": "electron-builder --win portable --publish never",
+    "dist:mac": "electron-builder --mac --publish never",
+    "dist:linux": "electron-builder --linux --publish never"
   },
   "keywords": ["electron", "llm", "openai", "anthropic", "gemini", "prompt"],
-  "author": "Mitzael Serna",
+  "author": "Mitzael Serna <kscius@gmail.com>",
   "license": "MIT",
   "dependencies": {
     "google-auth-library": "^10.6.2"
@@ -23,6 +23,7 @@
     "electron-builder": "^26.0.0"
   },
   "build": {
+    "publish": null,
     "appId": "com.mitzael.prompt-tester",
     "productName": "Prompt Tester",
     "copyright": "Copyright © Mitzael Serna",
