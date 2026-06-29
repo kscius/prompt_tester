@@ -47,23 +47,7 @@ jobs:
         run: npm run ${{ matrix.build_script }}
 
       - name: Collect release files
-        run: node -e "
-          const fs = require('fs');
-          const path = require('path');
-          const out = 'artifacts';
-          fs.mkdirSync(out, { recursive: true });
-          const exts = process.platform === 'win32' ? ['.exe']
-            : process.platform === 'darwin' ? ['.dmg', '.zip']
-            : ['.AppImage', '.deb'];
-          for (const f of fs.readdirSync('release')) {
-            const src = path.join('release', f);
-            if (fs.statSync(src).isFile() && exts.some((e) => f.endsWith(e))) {
-              fs.copyFileSync(src, path.join(out, f));
-            }
-          }
-          console.log('Artifacts:', fs.readdirSync(out).join(', ') || '(none)');
-          if (!fs.readdirSync(out).length) process.exit(1);
-        "
+        run: node scripts/collect-release-artifacts.js
 
       - name: Upload platform artifacts
         uses: actions/upload-artifact@v4
