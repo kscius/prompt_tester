@@ -1,3 +1,5 @@
+const { formatHttpError } = require('./errors');
+
 const BASE_URL = 'https://api.anthropic.com/v1';
 const ANTHROPIC_VERSION = '2023-06-01';
 
@@ -79,7 +81,7 @@ async function generate(ctx, { model, prompt, data, temperature }) {
 
     if (!res.ok) {
       const errBody = await res.text();
-      return { ok: false, error: `HTTP ${res.status}: ${errBody}` };
+      return { ok: false, error: formatHttpError(res.status, errBody, 'anthropic') };
     }
 
     const json = await res.json();
