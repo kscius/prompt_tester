@@ -22,6 +22,10 @@
     </div>
 
     <div class="header-center">
+      <label class="select-label" for="provider-select">Proveedor</label>
+      <select id="provider-select" class="model-select provider-select">
+        <option value="">Cargando…</option>
+      </select>
       <label class="select-label" for="model-select">Modelo</label>
       <select id="model-select" class="model-select">
         <option value="">Cargando modelos…</option>
@@ -29,9 +33,9 @@
     </div>
 
     <div class="header-right">
-      <button id="creds-btn" class="creds-btn" title="Gestionar credenciales de Google">
+      <button id="creds-btn" class="creds-btn" title="Proveedores y API keys">
         <span id="creds-dot" class="dot dot-error"></span>
-        <span id="creds-label">Sin credenciales</span>
+        <span id="creds-label">Sin API key</span>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
       </button>
     </div>
@@ -90,6 +94,7 @@
       <div class="output-toolbar">
         <div class="output-toolbar-left">
           <span class="block-label">Historial de respuestas</span>
+          <span id="pricing-source" class="pricing-source-badge hidden" title="Fuente de tarifas para el coste estimado"></span>
           <button type="button" id="coach-open-toolbar-btn" class="btn-coach-inline" title="Abrir asistente para mejorar el prompt">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
               <path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z"/>
@@ -197,50 +202,20 @@
     </div>
   </footer>
 
-  <!-- ── Credentials Modal ──────────────────────────────────────────── -->
+  <!-- ── Proveedores y API Keys Modal ───────────────────────────────── -->
   <div id="creds-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="creds-modal-title">
     <div class="modal-backdrop" id="creds-backdrop"></div>
-    <div class="modal-card">
+    <div class="modal-card modal-card--providers">
       <div class="modal-head">
-        <h2 id="creds-modal-title">Credenciales de Google</h2>
+        <h2 id="creds-modal-title">Proveedores y API Keys</h2>
         <button id="creds-close-btn" class="icon-btn modal-close" aria-label="Cerrar">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
 
-      <div class="modal-body">
-        <!-- Current credentials info (shown when credentials exist) -->
-        <div id="creds-current" class="creds-current hidden">
-          <div class="creds-status-row">
-            <span class="dot dot-success"></span>
-            <span class="creds-status-text">Credenciales configuradas</span>
-          </div>
-          <div id="creds-detail" class="creds-detail"></div>
-          <button id="remove-creds-btn" class="btn btn-danger-ghost">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
-            Eliminar credenciales
-          </button>
-        </div>
-
-        <div class="modal-section">
-          <p class="modal-section-title">Importar archivo JSON</p>
-          <button id="import-file-btn" class="btn btn-secondary w-full">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-            Seleccionar archivo service-account.json
-          </button>
-        </div>
-
-        <div class="modal-divider"><span>o pegar JSON</span></div>
-
-        <div class="modal-section">
-          <textarea
-            id="creds-paste-area"
-            class="code-area creds-paste-area"
-            placeholder='{"type":"service_account","project_id":"mi-proyecto","client_email":"...","private_key":"..."}'
-            spellcheck="false"
-          ></textarea>
-          <button id="save-pasted-creds-btn" class="btn btn-primary w-full">Guardar credenciales</button>
-        </div>
+      <div class="providers-modal-body">
+        <nav id="providers-sidebar" class="providers-sidebar" aria-label="Proveedores"></nav>
+        <div id="providers-panel" class="providers-panel"></div>
       </div>
     </div>
   </div>

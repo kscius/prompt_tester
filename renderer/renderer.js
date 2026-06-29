@@ -1,14 +1,72 @@
 'use strict';
 
+// ─── Provider definitions ────────────────────────────────────────────────────
+const PROVIDERS = [
+  {
+    id: 'openai',
+    name: 'OpenAI',
+    color: '#10a37f',
+    desc: 'GPT-4o, o1, o3 y modelos de OpenAI.',
+    icon: '<svg class="provider-tab-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M22.28 9.82a5.8 5.8 0 00-.52-4.78 5.86 5.86 0 00-6.31-2.82A5.86 5.86 0 007.82.42a5.87 5.87 0 00-5.58 4.03A5.86 5.86 0 00.08 9.4a5.86 5.86 0 002.1 6.56 5.8 5.8 0 00.52 4.78 5.86 5.86 0 006.31 2.82 5.86 5.86 0 005.63 1.98 5.87 5.87 0 005.58-4.03 5.86 5.86 0 001.16-4.95 5.86 5.86 0 00-2.1-6.56zM13.25 20.1l-3.3-1.76.83-1.45 3.3 1.76-.83 1.45zm1.45-2.52l-3.3-1.76 5.58-9.66 3.3 1.76-5.58 9.66zM7.4 18.58l-3.3-1.76L9.68 7.16l3.3 1.76L7.4 18.58zm-.83-10.1L3.27 6.72l1.45-.83 3.3 1.76-1.45.83z"/></svg>',
+  },
+  {
+    id: 'anthropic',
+    name: 'Anthropic',
+    color: '#d97757',
+    desc: 'Claude Opus, Sonnet y Haiku.',
+    icon: '<svg class="provider-tab-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M16.05 3H7.95L4 21h4.1l.7-3.5h6.4L15.8 21H20l-3.95-18zm-4.55 12.5H9.5L12 6.5l2.5 9z"/></svg>',
+  },
+  {
+    id: 'gemini',
+    name: 'Google Gemini',
+    color: '#4285f4',
+    desc: 'API Key o Service Account JSON de Google AI.',
+    icon: '<svg class="provider-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z"/></svg>',
+  },
+  {
+    id: 'minimax',
+    name: 'MiniMax',
+    color: '#6366f1',
+    desc: 'Requiere API Key y Group ID opcional.',
+    icon: '<svg class="provider-tab-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h6v16H4V4zm10 0h6v16h-6V4z"/></svg>',
+    hasGroupId: true,
+  },
+  {
+    id: 'mistral',
+    name: 'Mistral',
+    color: '#f97316',
+    desc: 'Mistral Large, Medium y Codestral.',
+    icon: '<svg class="provider-tab-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h4v4H4V4zm6 0h4v4h-4V4zm6 0h4v4h-4V4zM4 10h4v4H4v-4zm6 0h4v4h-4v-4zm6 0h4v4h-4v-4zM4 16h4v4H4v-4zm6 0h4v4h-4v-4zm6 0h4v4h-4v-4z"/></svg>',
+  },
+  {
+    id: 'groq',
+    name: 'Groq',
+    color: '#f55036',
+    desc: 'Inferencia ultrarrápida con Llama y Mixtral.',
+    icon: '<svg class="provider-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
+  },
+  {
+    id: 'deepseek',
+    name: 'DeepSeek',
+    color: '#4d6bfe',
+    desc: 'DeepSeek Chat, Reasoner y Coder.',
+    icon: '<svg class="provider-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C8 6 4 8 4 13a8 8 0 0016 0c0-5-4-7-8-11z"/><circle cx="12" cy="14" r="2" fill="currentColor" stroke="none"/></svg>',
+  },
+];
+
 // ─── State ──────────────────────────────────────────────────────────────────
-let savedPrompts    = [];
-let savedPanelOpen  = false;
-let isSending       = false;
-let lastRawText     = '';   // last response raw Markdown (for copy/export)
-let sessionCostUSD  = 0;
-let responseHistory = [];   // [{ model, temperature, text, meta }] – grows each send
+let savedPrompts       = [];
+let savedPanelOpen     = false;
+let isSending          = false;
+let lastRawText        = '';
+let sessionCostUSD     = 0;
+let responseHistory    = [];
+let providersStatus    = { activeProvider: 'gemini', providers: {} };
+let modalProviderId    = 'gemini';
+let geminiAuthMode     = 'api-key';
 
 // ─── DOM references ──────────────────────────────────────────────────────────
+const providerSelect   = document.getElementById('provider-select');
 const modelSelect      = document.getElementById('model-select');
 const promptInput      = document.getElementById('prompt-input');
 const dataInput        = document.getElementById('data-input');
@@ -23,6 +81,7 @@ const tokenInfo        = document.getElementById('token-info');
 const timeInfo         = document.getElementById('time-info');
 const costInfo         = document.getElementById('cost-info');
 const sessionCostEl    = document.getElementById('session-cost');
+const pricingSourceEl  = document.getElementById('pricing-source');
 const finishInfo       = document.getElementById('finish-info');
 const tempRange        = document.getElementById('temp-range');
 const tempValue        = document.getElementById('temp-value');
@@ -47,50 +106,455 @@ const credsBtn         = document.getElementById('creds-btn');
 const credsModal       = document.getElementById('creds-modal');
 const credsBackdrop    = document.getElementById('creds-backdrop');
 const credsCloseBtn    = document.getElementById('creds-close-btn');
-const credsCurrent     = document.getElementById('creds-current');
-const credsDetail      = document.getElementById('creds-detail');
-const removeCreds      = document.getElementById('remove-creds-btn');
-const importFileBtn    = document.getElementById('import-file-btn');
-const credsPasteArea   = document.getElementById('creds-paste-area');
-const savePastedBtn    = document.getElementById('save-pasted-creds-btn');
+const providersSidebar = document.getElementById('providers-sidebar');
+const providersPanel   = document.getElementById('providers-panel');
+
+// ─── Backward-compat API wrappers ───────────────────────────────────────────
+async function getProvidersOverview() {
+  if (typeof window.api.getProvidersStatus === 'function') {
+    return window.api.getProvidersStatus();
+  }
+  const legacy = await window.api.getCredsStatus();
+  return {
+    activeProvider: 'gemini',
+    providers: {
+      gemini: legacy.ok
+        ? { configured: true, authMode: 'service-account', projectId: legacy.projectId, clientEmail: legacy.clientEmail, maskedKey: legacy.projectId }
+        : { configured: false },
+    },
+  };
+}
+
+async function callLLM(args) {
+  if (typeof window.api.callLLM === 'function') {
+    return window.api.callLLM(args);
+  }
+  return window.api.callGemini(args);
+}
+
+async function fetchModels(providerId) {
+  return window.api.getModels(providerId);
+}
+
+function getActiveProviderId() {
+  return providerSelect?.value || providersStatus.activeProvider || 'gemini';
+}
+
+function getProviderDef(id) {
+  return PROVIDERS.find(p => p.id === id) ?? { id, name: id, color: 'var(--accent)', desc: '', icon: '' };
+}
+
+function isProviderConfigured(info) {
+  return !!(info?.configured || info?.ok);
+}
+
+function getMaskedLabel(info) {
+  if (info?.maskedKey) return info.maskedKey;
+  if (info?.authMode === 'service-account' && info?.projectId) return info.projectId;
+  if (info?.projectId) return info.projectId;
+  return 'Configurado';
+}
 
 // ─── Initialise ──────────────────────────────────────────────────────────────
 async function init() {
-  await Promise.all([loadModels(), refreshCredsStatus(), loadSavedPrompts()]);
+  renderProvidersModal();
+  await loadProviders();
+  await Promise.all([loadModels(), refreshCredsStatus(), loadSavedPrompts(), loadPricingStatus()]);
   updateCounts();
+  schedulePricingStatusPoll();
+}
+
+async function loadPricingStatus() {
+  if (typeof window.api.getPricingStatus !== 'function') return;
+  try {
+    const status = await window.api.getPricingStatus();
+    applyPricingStatusUI(status);
+  } catch {}
+}
+
+function schedulePricingStatusPoll() {
+  if (typeof window.api.getPricingStatus !== 'function') return;
+  setTimeout(async () => {
+    try {
+      const status = await window.api.getPricingStatus();
+      applyPricingStatusUI(status);
+    } catch {}
+  }, 4000);
+}
+
+function applyPricingStatusUI(status) {
+  if (!pricingSourceEl || !status) return;
+  const label = fmtPricingSource(status);
+  if (!label) {
+    pricingSourceEl.classList.add('hidden');
+    return;
+  }
+  pricingSourceEl.textContent = label;
+  pricingSourceEl.title = status.error
+    ? `No se pudieron actualizar tarifas en línea: ${status.error}. Se usan valores en caché o embebidos.`
+    : `Tarifas ${status.source === 'litellm' ? 'sincronizadas' : 'embebidas'} · ${status.modelCount ?? 0} modelos indexados`;
+  pricingSourceEl.classList.remove('hidden');
+}
+
+function fmtPricingSource(status) {
+  if (!status) return '';
+  if (status.fetchedAt) {
+    try {
+      const d = new Date(status.fetchedAt);
+      const date = d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
+      const time = d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+      return `Tarifas · ${date} ${time}`;
+    } catch {
+      return 'Tarifas actualizadas';
+    }
+  }
+  if (status.source === 'bundled') return 'Tarifas embebidas';
+  if (status.source === 'cache') return 'Tarifas en caché';
+  return '';
+}
+
+async function loadProviders() {
+  let list = PROVIDERS;
+  if (typeof window.api.listProviders === 'function') {
+    try {
+      const remote = await window.api.listProviders();
+      if (Array.isArray(remote) && remote.length) list = remote;
+    } catch {}
+  }
+
+  providersStatus = await getProvidersOverview();
+  const active = providersStatus.activeProvider ?? 'gemini';
+
+  providerSelect.innerHTML = list.map(p => {
+    const id = p.id ?? p.providerId;
+    const name = p.name ?? p.label ?? id;
+    return `<option value="${esc(id)}"${id === active ? ' selected' : ''}>${esc(name)}</option>`;
+  }).join('');
+
+  if (!providerSelect.value && providerSelect.options.length) {
+    providerSelect.selectedIndex = 0;
+  }
 }
 
 async function loadModels() {
   const previous = modelSelect.value;
-  const models = await window.api.getModels();
-  modelSelect.innerHTML = models
+  const providerId = getActiveProviderId();
+  const models = await fetchModels(providerId);
+  modelSelect.innerHTML = (models ?? [])
     .map(m => `<option value="${esc(m.id)}">${esc(m.label)}</option>`)
     .join('');
+  if (!modelSelect.options.length) {
+    modelSelect.innerHTML = '<option value="">Sin modelos disponibles</option>';
+  }
   if (previous && [...modelSelect.options].some(o => o.value === previous)) {
     modelSelect.value = previous;
   }
 }
 
 async function refreshCredsStatus() {
-  const result = await window.api.getCredsStatus();
-  applyCredsUI(result);
+  providersStatus = await getProvidersOverview();
+  applyProviderStatusUI(providersStatus);
+  updateProviderPanels(providersStatus);
 }
 
-function applyCredsUI(result) {
-  if (result.ok) {
-    credsDot.className   = 'dot dot-success';
-    credsLabel.textContent = result.projectId ?? 'Conectado';
-    credsCurrent.classList.remove('hidden');
-    credsDetail.innerHTML = `
-      <span>Proyecto: <strong style="color:var(--text)">${esc(result.projectId ?? '')}</strong></span>
-      <span>Cuenta:   <strong style="color:var(--text)">${esc(result.clientEmail ?? '')}</strong></span>
-    `;
+function applyProviderStatusUI(status) {
+  const active = getActiveProviderId();
+  const info = status.providers?.[active] ?? {};
+  const def = getProviderDef(active);
+
+  if (isProviderConfigured(info)) {
+    credsDot.className = 'dot dot-success';
+    credsLabel.textContent = `${def.name} · ${getMaskedLabel(info)}`;
   } else {
-    credsDot.className   = 'dot dot-error';
-    credsLabel.textContent = 'Sin credenciales';
-    credsCurrent.classList.add('hidden');
+    credsDot.className = 'dot dot-error';
+    credsLabel.textContent = `${def.name} · Sin API key`;
+  }
+
+  providersSidebar?.querySelectorAll('.provider-tab').forEach(tab => {
+    const pid = tab.dataset.provider;
+    const pInfo = status.providers?.[pid];
+    const dot = tab.querySelector('.provider-tab-dot');
+    if (dot) dot.classList.toggle('configured', isProviderConfigured(pInfo));
+  });
+}
+
+// ─── Providers modal ─────────────────────────────────────────────────────────
+function renderProvidersModal() {
+  providersSidebar.innerHTML = PROVIDERS.map(p => `
+    <button type="button" class="provider-tab" data-provider="${esc(p.id)}" aria-label="${esc(p.name)}">
+      <span style="color:${esc(p.color)}">${p.icon}</span>
+      <span class="provider-tab-name">${esc(p.name)}</span>
+      <span class="provider-tab-dot"></span>
+    </button>
+  `).join('');
+
+  providersPanel.innerHTML = PROVIDERS.map(p => {
+    if (p.id === 'gemini') return renderGeminiPanel(p);
+    return renderApiKeyPanel(p);
+  }).join('');
+
+  providersSidebar.querySelectorAll('.provider-tab').forEach(tab => {
+    tab.addEventListener('click', () => switchModalProvider(tab.dataset.provider));
+  });
+
+  setupProviderPanelEvents();
+  switchModalProvider(modalProviderId);
+}
+
+function renderApiKeyPanel(p) {
+  const groupField = p.hasGroupId ? `
+    <div class="provider-field">
+      <label class="provider-field-label" for="key-${esc(p.id)}-group">Group ID (opcional)</label>
+      <input type="text" id="key-${esc(p.id)}-group" class="provider-input" placeholder="grp_…" autocomplete="off" spellcheck="false">
+    </div>` : '';
+
+  return `
+    <div class="provider-panel" data-provider="${esc(p.id)}" id="panel-${esc(p.id)}">
+      <div class="provider-panel-head">
+        <span class="provider-panel-icon" style="color:${esc(p.color)}">${p.icon.replace('provider-tab-icon', 'provider-panel-icon-svg')}</span>
+        <div>
+          <div class="provider-panel-title">${esc(p.name)}</div>
+          <p class="provider-panel-desc">${esc(p.desc)}</p>
+        </div>
+      </div>
+      <div class="provider-status-banner unconfigured" id="status-${esc(p.id)}">
+        <span class="dot dot-error"></span>
+        <span>Sin API key configurada</span>
+      </div>
+      <div class="provider-field">
+        <label class="provider-field-label" for="key-${esc(p.id)}">API Key</label>
+        <input type="password" id="key-${esc(p.id)}" class="provider-input" placeholder="sk-…" autocomplete="off" spellcheck="false">
+      </div>
+      ${groupField}
+      <div class="provider-actions">
+        <button type="button" class="btn btn-primary provider-save-btn" data-provider="${esc(p.id)}">Guardar</button>
+        <button type="button" class="btn btn-danger-ghost provider-clear-btn" data-provider="${esc(p.id)}">Limpiar</button>
+      </div>
+    </div>`;
+}
+
+function renderGeminiPanel(p) {
+  return `
+    <div class="provider-panel" data-provider="gemini" id="panel-gemini">
+      <div class="provider-panel-head">
+        <span class="provider-panel-icon" style="color:${esc(p.color)}">${p.icon.replace('provider-tab-icon', 'provider-panel-icon-svg')}</span>
+        <div>
+          <div class="provider-panel-title">${esc(p.name)}</div>
+          <p class="provider-panel-desc">${esc(p.desc)}</p>
+        </div>
+      </div>
+      <div class="provider-status-banner unconfigured" id="status-gemini">
+        <span class="dot dot-error"></span>
+        <span>Sin credenciales configuradas</span>
+      </div>
+      <div class="gemini-auth-toggle" role="group" aria-label="Modo de autenticación Gemini">
+        <button type="button" class="gemini-auth-btn active" data-mode="api-key">API Key</button>
+        <button type="button" class="gemini-auth-btn" data-mode="service-account">Service Account</button>
+      </div>
+      <div class="gemini-section gemini-api-section" id="gemini-api-section">
+        <div class="provider-field">
+          <label class="provider-field-label" for="key-gemini">API Key</label>
+          <input type="password" id="key-gemini" class="provider-input" placeholder="AIza…" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="provider-actions">
+          <button type="button" class="btn btn-primary provider-save-btn" data-provider="gemini" data-auth="api-key">Guardar</button>
+          <button type="button" class="btn btn-danger-ghost provider-clear-btn" data-provider="gemini">Limpiar</button>
+        </div>
+      </div>
+      <div class="gemini-section gemini-sa-section hidden" id="gemini-sa-section">
+        <div id="gemini-sa-detail" class="provider-sa-detail hidden"></div>
+        <div class="modal-section">
+          <p class="modal-section-title">Importar archivo JSON</p>
+          <button type="button" id="import-file-btn" class="btn btn-secondary w-full">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Seleccionar archivo service-account.json
+          </button>
+        </div>
+        <div class="modal-divider"><span>o pegar JSON</span></div>
+        <div class="modal-section">
+          <textarea
+            id="creds-paste-area"
+            class="code-area creds-paste-area"
+            placeholder='{"type":"service_account","project_id":"mi-proyecto","client_email":"...","private_key":"..."}'
+            spellcheck="false"
+          ></textarea>
+          <button type="button" id="save-pasted-creds-btn" class="btn btn-primary w-full">Guardar credenciales</button>
+        </div>
+        <div class="provider-actions">
+          <button type="button" class="btn btn-danger-ghost provider-clear-btn" data-provider="gemini">Limpiar</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function switchModalProvider(providerId) {
+  modalProviderId = providerId;
+  providersSidebar.querySelectorAll('.provider-tab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.provider === providerId);
+  });
+  providersPanel.querySelectorAll('.provider-panel').forEach(panel => {
+    panel.classList.toggle('active', panel.dataset.provider === providerId);
+  });
+}
+
+function updateProviderPanels(status) {
+  for (const p of PROVIDERS) {
+    const info = status.providers?.[p.id] ?? {};
+    const banner = document.getElementById(`status-${p.id}`);
+    if (!banner) continue;
+
+    if (isProviderConfigured(info)) {
+      banner.className = 'provider-status-banner';
+      const label = p.id === 'gemini' && info.authMode === 'service-account'
+        ? `Service Account · ${esc(info.projectId ?? 'configurado')}`
+        : getMaskedLabel(info);
+      banner.innerHTML = `<span class="dot dot-success"></span><span>${esc(label)}</span>`;
+    } else {
+      banner.className = 'provider-status-banner unconfigured';
+      banner.innerHTML = `<span class="dot dot-error"></span><span>${p.id === 'gemini' ? 'Sin credenciales configuradas' : 'Sin API key configurada'}</span>`;
+    }
+
+    if (p.id === 'gemini' && info.authMode === 'service-account') {
+      geminiAuthMode = 'service-account';
+      setGeminiAuthMode('service-account');
+      const detail = document.getElementById('gemini-sa-detail');
+      if (detail && info.projectId) {
+        detail.classList.remove('hidden');
+        detail.innerHTML = `
+          <span>Proyecto: <strong>${esc(info.projectId)}</strong></span>
+          <span>Cuenta: <strong>${esc(info.clientEmail ?? '')}</strong></span>`;
+      }
+    }
   }
 }
+
+function setGeminiAuthMode(mode) {
+  geminiAuthMode = mode;
+  document.querySelectorAll('.gemini-auth-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.mode === mode);
+  });
+  document.getElementById('gemini-api-section')?.classList.toggle('hidden', mode !== 'api-key');
+  document.getElementById('gemini-sa-section')?.classList.toggle('hidden', mode !== 'service-account');
+}
+
+function setupProviderPanelEvents() {
+  document.querySelectorAll('.gemini-auth-btn').forEach(btn => {
+    btn.addEventListener('click', () => setGeminiAuthMode(btn.dataset.mode));
+  });
+
+  document.querySelectorAll('.provider-save-btn').forEach(btn => {
+    btn.addEventListener('click', () => saveProviderKey(btn.dataset.provider));
+  });
+
+  document.querySelectorAll('.provider-clear-btn').forEach(btn => {
+    btn.addEventListener('click', () => clearProviderKey(btn.dataset.provider));
+  });
+
+  document.getElementById('import-file-btn')?.addEventListener('click', importServiceAccountFile);
+  document.getElementById('save-pasted-creds-btn')?.addEventListener('click', savePastedServiceAccount);
+}
+
+async function saveProviderKey(providerId) {
+  const keyInput = document.getElementById(`key-${providerId}`);
+  const apiKey = keyInput?.value.trim();
+  if (!apiKey) {
+    toast('Introduce una API key');
+    keyInput?.focus();
+    return;
+  }
+
+  const payload = { providerId, apiKey };
+  if (providerId === 'minimax') {
+    const groupId = document.getElementById('key-minimax-group')?.value.trim();
+    if (groupId) payload.groupId = groupId;
+  }
+
+  let result;
+  if (typeof window.api.saveProviderApiKey === 'function') {
+    result = await window.api.saveProviderApiKey(payload);
+  } else if (providerId === 'gemini') {
+    result = await window.api.saveCredsJson(JSON.stringify({ type: 'api_key', api_key: apiKey }));
+  } else {
+    toast('API de proveedores no disponible');
+    return;
+  }
+
+  if (result?.ok !== false && !result?.error) {
+    if (keyInput) keyInput.value = '';
+    await refreshCredsStatus();
+    await loadModels();
+    toast(`${getProviderDef(providerId).name} guardado`);
+  } else {
+    toast(`Error: ${result?.error ?? 'No se pudo guardar'}`);
+  }
+}
+
+async function clearProviderKey(providerId) {
+  let result;
+  if (typeof window.api.clearProvider === 'function') {
+    result = await window.api.clearProvider(providerId);
+  } else if (providerId === 'gemini' && typeof window.api.clearCreds === 'function') {
+    result = await window.api.clearCreds();
+  } else {
+    toast('API de proveedores no disponible');
+    return;
+  }
+
+  if (result?.ok !== false && !result?.error) {
+    const keyEl = document.getElementById(`key-${providerId}`);
+    if (keyEl) keyEl.value = '';
+    if (providerId === 'gemini') {
+      const pasteArea = document.getElementById('creds-paste-area');
+      if (pasteArea) pasteArea.value = '';
+      document.getElementById('gemini-sa-detail')?.classList.add('hidden');
+    }
+    await refreshCredsStatus();
+    await loadModels();
+    toast(`${getProviderDef(providerId).name} eliminado`);
+  } else {
+    toast(`Error: ${result?.error ?? 'No se pudo eliminar'}`);
+  }
+}
+
+async function importServiceAccountFile() {
+  const result = await window.api.selectCredsFile();
+  if (result?.ok) {
+    await refreshCredsStatus();
+    await loadModels();
+    toast('Service Account importado');
+  } else if (result?.error) {
+    toast(`Error: ${result.error}`);
+  }
+}
+
+async function savePastedServiceAccount() {
+  const pasteArea = document.getElementById('creds-paste-area');
+  const json = pasteArea?.value.trim();
+  if (!json) {
+    toast('Pega el contenido JSON primero');
+    return;
+  }
+
+  const result = await window.api.saveCredsJson(json);
+  if (result?.ok) {
+    if (pasteArea) pasteArea.value = '';
+    await refreshCredsStatus();
+    await loadModels();
+    toast('Service Account guardado');
+  } else {
+    toast(`Error: ${result?.error ?? 'JSON inválido'}`);
+  }
+}
+
+providerSelect?.addEventListener('change', async () => {
+  const providerId = providerSelect.value;
+  if (typeof window.api.setActiveProvider === 'function') {
+    await window.api.setActiveProvider(providerId);
+  }
+  providersStatus.activeProvider = providerId;
+  await loadModels();
+  await refreshCredsStatus();
+});
 
 async function loadSavedPrompts() {
   savedPrompts = await window.api.listPrompts();
@@ -136,7 +600,7 @@ function renderSavedList() {
   });
 }
 
-function loadPreset(name) {
+async function loadPreset(name) {
   const p = savedPrompts.find(x => x.name === name);
   if (!p) return;
   promptInput.value   = p.prompt ?? '';
@@ -144,17 +608,28 @@ function loadPreset(name) {
   saveNameInput.value = name;
   updateCounts();
 
-  // Restore model and temperature if the preset stored them
+  if (p.provider) {
+    const opt = providerSelect.querySelector(`option[value="${CSS.escape(p.provider)}"]`);
+    if (opt) {
+      providerSelect.value = p.provider;
+      if (typeof window.api.setActiveProvider === 'function') {
+        await window.api.setActiveProvider(p.provider);
+      }
+      providersStatus.activeProvider = p.provider;
+      await loadModels();
+      await refreshCredsStatus();
+    }
+  }
+
   if (p.model) {
     const opt = modelSelect.querySelector(`option[value="${CSS.escape(p.model)}"]`);
     if (opt) modelSelect.value = p.model;
   }
   if (p.temperature != null) {
-    tempRange.value     = p.temperature;
+    tempRange.value       = p.temperature;
     tempValue.textContent = parseFloat(p.temperature).toFixed(1);
   }
 
-  // Restore response history saved with the preset
   if (Array.isArray(p.responses) && p.responses.length) {
     responseHistory = p.responses.slice();
     renderHistory();
@@ -179,7 +654,7 @@ tempRange.addEventListener('input', () => {
   tempValue.textContent = parseFloat(tempRange.value).toFixed(1);
 });
 
-// ─── Ayuda de temperatura (panel clickeable + backdrop) ───────────────────
+// ─── Ayuda de temperatura ───────────────────────────────────────────────────
 function isTempHelpOpen() {
   return !tempHelpPopover.classList.contains('hidden');
 }
@@ -237,6 +712,7 @@ window.addEventListener('resize', () => {
 async function sendRequest() {
   if (isSending) return;
 
+  const provider    = getActiveProviderId();
   const model       = modelSelect.value;
   const prompt      = promptInput.value;
   const data        = dataInput.value;
@@ -244,10 +720,11 @@ async function sendRequest() {
 
   if (!model) { toast('Selecciona un modelo primero'); return; }
 
-  const status = await window.api.getCredsStatus();
-  if (!status.ok) {
-    toast('Configura tus credenciales de Google primero');
-    openCredsModal();
+  const status = await getProvidersOverview();
+  const pinfo = status.providers?.[provider];
+  if (!isProviderConfigured(pinfo)) {
+    toast(`Configura la API key de ${getProviderDef(provider).name} primero`);
+    openCredsModal(provider);
     return;
   }
 
@@ -256,7 +733,6 @@ async function sendRequest() {
   sendLoading.classList.remove('hidden');
   sendBtn.disabled = true;
 
-  // Show a loading placeholder at the bottom of the history
   const placeholderId = `ph-${Date.now()}`;
   const placeholder   = document.createElement('div');
   placeholder.id        = placeholderId;
@@ -274,7 +750,6 @@ async function sendRequest() {
       Procesando…
     </div>`;
 
-  // Remove empty-state placeholder if present
   const empty = outputArea.querySelector('.output-empty');
   if (empty) empty.remove();
   outputArea.appendChild(placeholder);
@@ -283,25 +758,20 @@ async function sendRequest() {
   const startMs = Date.now();
 
   try {
-    const result = await window.api.callGemini({ model, prompt, data, temperature });
+    const result = await callLLM({ provider, model, prompt, data, temperature });
     const elapsed = ((Date.now() - startMs) / 1000).toFixed(1);
 
     placeholder.remove();
 
     if (result.ok) {
       lastRawText = result.text ?? '';
-
-      // Build metadata for this response
       const meta = { elapsed, usage: result.usage, cost: result.cost, finishReason: result.finishReason };
-
-      // Push to history and re-render
-      responseHistory.push({ model, temperature, text: lastRawText, meta, ts: new Date().toISOString() });
+      responseHistory.push({ model, temperature, text: lastRawText, meta, ts: new Date().toISOString(), provider });
       renderHistory();
 
-      // Update session-level footer meta
       if (result.usage) {
         const u = result.usage;
-        tokenInfo.textContent  = `Tokens  entrada: ${u.promptTokenCount ?? '—'} · salida: ${u.candidatesTokenCount ?? '—'} · total: ${u.totalTokenCount ?? '—'}`;
+        tokenInfo.textContent  = `Tokens  entrada: ${u.promptTokenCount ?? '—'} · salida: ${u.candidatesTokenCount ?? u.completionTokenCount ?? '—'} · total: ${u.totalTokenCount ?? '—'}`;
         timeInfo.textContent   = `⏱ ${elapsed}s`;
         finishInfo.textContent = result.finishReason ? `Fin: ${result.finishReason}` : '';
 
@@ -317,7 +787,6 @@ async function sendRequest() {
         outputMeta.classList.remove('hidden');
       }
 
-      // Scroll last entry into view
       outputArea.lastElementChild?.scrollIntoView({ behavior: 'smooth', block: 'end' });
     } else {
       const errEntry = document.createElement('div');
@@ -389,7 +858,6 @@ function renderHistory() {
 
 sendBtn.addEventListener('click', sendRequest);
 
-// Ctrl+Enter shortcut from any focused element
 document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
     e.preventDefault();
@@ -400,7 +868,6 @@ document.addEventListener('keydown', e => {
 // ─── Output toolbar ───────────────────────────────────────────────────────────
 copyBtn.addEventListener('click', async () => {
   if (!responseHistory.length) { toast('No hay contenido para copiar'); return; }
-  // Copy all responses joined with a separator
   const all = responseHistory
     .map((e, i) => `## Respuesta #${i + 1} — ${e.model} (temp ${parseFloat(e.temperature).toFixed(1)})\n\n${e.text}`)
     .join('\n\n---\n\n');
@@ -433,7 +900,6 @@ clearAllBtn.addEventListener('click', () => {
   dataInput.value     = '';
   saveNameInput.value = '';
   updateCounts();
-  // Manually reset rather than triggering click so we avoid double resets
   lastRawText     = '';
   responseHistory = [];
   renderHistory();
@@ -451,6 +917,7 @@ savePresetBtn.addEventListener('click', async () => {
     name,
     prompt:      promptInput.value,
     data:        dataInput.value,
+    provider:    getActiveProviderId(),
     model:       modelSelect.value,
     temperature: parseFloat(tempRange.value),
     responses:   responseHistory.slice(),
@@ -500,19 +967,24 @@ savedToggle.addEventListener('click', () => {
   });
 })();
 
-// ─── Credentials modal ────────────────────────────────────────────────────────
-function openCredsModal() {
+// ─── Providers modal open/close ───────────────────────────────────────────────
+function openCredsModal(providerId) {
   if (isTempHelpOpen()) closeTempHelp();
-  credsPasteArea.value = '';
+  if (providerId) switchModalProvider(providerId);
+  else switchModalProvider(getActiveProviderId());
+  const pasteArea = document.getElementById('creds-paste-area');
+  if (pasteArea) pasteArea.value = '';
   credsModal.classList.remove('hidden');
-  credsPasteArea.focus();
+  const firstInput = providersPanel.querySelector('.provider-panel.active .provider-input');
+  if (firstInput) firstInput.focus();
+  else providersSidebar.querySelector('.provider-tab.active')?.focus();
 }
 
 function closeCredsModal() {
   credsModal.classList.add('hidden');
 }
 
-credsBtn.addEventListener('click', openCredsModal);
+credsBtn.addEventListener('click', () => openCredsModal());
 credsCloseBtn.addEventListener('click', closeCredsModal);
 credsBackdrop.addEventListener('click', closeCredsModal);
 document.addEventListener('keydown', e => {
@@ -527,41 +999,22 @@ document.addEventListener('keydown', e => {
   closeCredsModal();
 });
 
-importFileBtn.addEventListener('click', async () => {
-  const result = await window.api.selectCredsFile();
-  if (result.ok) {
-    applyCredsUI(result);
-    await loadModels();
-    closeCredsModal();
-    toast('Credenciales importadas correctamente');
-  } else if (result.error) {
-    toast(`Error: ${result.error}`);
+// Legacy alias for prompt-coach and external callers
+function applyCredsUI(result) {
+  if (result?.providers) {
+    applyProviderStatusUI(result);
+    return;
   }
-});
-
-savePastedBtn.addEventListener('click', async () => {
-  const json = credsPasteArea.value.trim();
-  if (!json) { toast('Pega el contenido JSON primero'); return; }
-
-  const result = await window.api.saveCredsJson(json);
-  if (result.ok) {
-    applyCredsUI(result);
-    await loadModels();
-    closeCredsModal();
-    toast('Credenciales guardadas');
-  } else {
-    toast(`Error: ${result.error}`);
-  }
-});
-
-removeCreds.addEventListener('click', async () => {
-  const result = await window.api.clearCreds();
-  if (result.ok) {
-    applyCredsUI({ ok: false });
-    await loadModels();
-    toast('Credenciales eliminadas');
-  }
-});
+  providersStatus = {
+    activeProvider: 'gemini',
+    providers: {
+      gemini: result?.ok
+        ? { configured: true, authMode: 'service-account', projectId: result.projectId, clientEmail: result.clientEmail }
+        : { configured: false },
+    },
+  };
+  applyProviderStatusUI(providersStatus);
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function esc(str) {
@@ -574,7 +1027,6 @@ function esc(str) {
 function fmtCost(usd) {
   if (usd == null) return '';
   if (usd === 0) return '$0.000000 USD';
-  // Show enough decimal places to be meaningful
   const decimals = usd < 0.0001 ? 8 : usd < 0.01 ? 6 : 4;
   return `$${usd.toFixed(decimals)} USD`;
 }
@@ -614,8 +1066,10 @@ window.promptTester = {
   promptInput,
   dataInput,
   modelSelect,
+  providerSelect,
   tempRange,
   toast,
   openCredsModal,
+  getActiveProviderId,
 };
 init();

@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "source": "bundled",
+  "providers": {
+    "openai": {
+      "gpt-4o": { "inputPerM": 2.5, "outputPerM": 10.0 },
+      "gpt-4o-mini": { "inputPerM": 0.15, "outputPerM": 0.6 },
+      "gpt-4-turbo": { "inputPerM": 10.0, "outputPerM": 30.0 },
+      "o1": { "inputPerM": 15.0, "outputPerM": 60.0 },
+      "o3-mini": { "inputPerM": 1.1, "outputPerM": 4.4 }
+    },
+    "anthropic": {
+      "claude-sonnet-4-20250514": { "inputPerM": 3.0, "outputPerM": 15.0 },
+      "claude-3-7-sonnet-20250219": { "inputPerM": 3.0, "outputPerM": 15.0 },
+      "claude-3-5-sonnet-20241022": { "inputPerM": 3.0, "outputPerM": 15.0 },
+      "claude-3-5-haiku-20241022": { "inputPerM": 0.8, "outputPerM": 4.0 },
+      "claude-3-opus-20240229": { "inputPerM": 15.0, "outputPerM": 75.0 }
+    },
+    "gemini": {
+      "gemini-2.5-flash-lite": { "inputPerM": 0.075, "outputPerM": 0.30 },
+      "gemini-2.5-flash": { "inputPerM": 0.30, "outputPerM": 2.50 },
+      "gemini-2.0-flash-001": { "inputPerM": 0.075, "outputPerM": 0.30 },
+      "gemini-2.0-flash-lite-001": { "inputPerM": 0.0375, "outputPerM": 0.15 },
+      "gemini-1.5-flash-002": { "inputPerM": 0.075, "outputPerM": 0.30 },
+      "gemini-1.5-pro-002": { "inputPerM": 1.25, "outputPerM": 5.00 }
+    },
+    "minimax": {
+      "abab6.5s-chat": { "inputPerM": 0.30, "outputPerM": 1.20 },
+      "abab6.5g-chat": { "inputPerM": 0.30, "outputPerM": 1.20 },
+      "MiniMax-Text-01": { "inputPerM": 0.30, "outputPerM": 1.20 }
+    },
+    "mistral": {
+      "mistral-large-latest": { "inputPerM": 2.0, "outputPerM": 6.0 },
+      "mistral-small-latest": { "inputPerM": 0.2, "outputPerM": 0.6 },
+      "codestral-latest": { "inputPerM": 0.3, "outputPerM": 0.9 }
+    },
+    "groq": {
+      "llama-3.3-70b-versatile": { "inputPerM": 0.59, "outputPerM": 0.79 },
+      "llama-3.1-8b-instant": { "inputPerM": 0.05, "outputPerM": 0.08 },
+      "mixtral-8x7b-32768": { "inputPerM": 0.24, "outputPerM": 0.24 }
+    },
+    "deepseek": {
+      "deepseek-chat": { "inputPerM": 0.27, "outputPerM": 1.10 },
+      "deepseek-reasoner": { "inputPerM": 0.55, "outputPerM": 2.19 }
+    }
+  }
+}

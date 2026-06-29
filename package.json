@@ -1,7 +1,7 @@
 {
   "name": "prompt-tester",
   "version": "1.3.0",
-  "description": "Interactive LLM Prompt Tester for Gemini models",
+  "description": "Interactive LLM Prompt Tester for OpenAI, Anthropic, Gemini, MiniMax, Mistral, Groq, DeepSeek and more",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -12,7 +12,7 @@
     "dist:mac": "electron-builder --mac",
     "dist:linux": "electron-builder --linux"
   },
-  "keywords": ["electron", "llm", "gemini", "prompt"],
+  "keywords": ["electron", "llm", "openai", "anthropic", "gemini", "prompt"],
   "author": "Mitzael Serna",
   "license": "MIT",
   "dependencies": {

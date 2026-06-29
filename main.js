@@ -1,11 +1,29 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const {
+  getActiveProviderId,
+  setActiveProviderId,
+  setProviderSettings,
+  getProviderSettings,
+  maskApiKey,
+} = require('./providers/config');
+const {
+  listProviderMeta,
+  invalidateModelsCache,
+  listModelsForProvider,
+  callProvider,
+  getProvider,
+} = require('./providers/registry');
+const {
+  initPricing,
+  refreshPricingOnOpen,
+  calcCost,
+  getPricingStatus,
+} = require('./providers/pricing');
 
 // ---------------------------------------------------------------------------
-// Chromium / Windows: caché en disco y GPU (evita "Access denied", Gpu Cache
-// Creation failed). Debe ir antes de app.ready — setPath + commandLine.
-// Una sola instancia evita que dos procesos peleen por los mismos archivos.
+// Chromium / Windows: caché en disco y GPU
 // ---------------------------------------------------------------------------
 (function configureChromiumForWindows() {
   try {
@@ -53,144 +71,138 @@ function writeJSON(filePath, data) {
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
 }
 
-// ---------------------------------------------------------------------------
-// Available models (fetched from Gemini API; fallback when offline / no creds)
-// ---------------------------------------------------------------------------
-
-const FALLBACK_MODELS = [
-  { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite' },
-  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
-  { id: 'gemini-2.0-flash-001', label: 'Gemini 2.0 Flash (001)' },
-  { id: 'gemini-2.0-flash-lite-001', label: 'Gemini 2.0 Flash Lite (001)' },
-  { id: 'gemini-1.5-flash-002', label: 'Gemini 1.5 Flash (002)' },
-  { id: 'gemini-1.5-pro-002', label: 'Gemini 1.5 Pro (002)' },
-];
-
-let modelsCache = null;
-let modelsCacheKey = null;
-
-function invalidateModelsCache() {
-  modelsCache = null;
-  modelsCacheKey = null;
-}
-
-async function getGeminiAccessToken() {
-  const creds = readJSON(getDataPath('credentials.json'));
-  if (!creds) {
-    return { ok: false, error: 'Sin credenciales configuradas. Configúralas en el botón de credenciales.' };
-  }
-
-  const { GoogleAuth } = await import('google-auth-library');
-  const auth = new GoogleAuth({
-    credentials: creds,
-    scopes: [
-      'https://www.googleapis.com/auth/cloud-platform',
-      'https://www.googleapis.com/auth/generative-language',
-    ],
-  });
-
-  const client = await auth.getClient();
-  const tokenResult = await client.getAccessToken();
-  const accessToken = tokenResult.token;
-  if (!accessToken) {
-    return { ok: false, error: 'No se pudo obtener el token de acceso.' };
-  }
-
-  return { ok: true, token: accessToken, cacheKey: creds.client_email ?? creds.project_id ?? 'default' };
-}
-
-async function fetchAllApiModels(accessToken) {
-  const collected = [];
-  let pageToken;
-
-  do {
-    const url = new URL('https://generativelanguage.googleapis.com/v1beta/models');
-    url.searchParams.set('pageSize', '1000');
-    if (pageToken) url.searchParams.set('pageToken', pageToken);
-
-    const res = await fetch(url.toString(), {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-
-    if (!res.ok) {
-      const errBody = await res.text();
-      throw new Error(`HTTP ${res.status}: ${errBody}`);
-    }
-
-    const json = await res.json();
-    if (Array.isArray(json.models)) collected.push(...json.models);
-    pageToken = json.nextPageToken;
-  } while (pageToken);
-
-  return collected;
-}
-
-function apiModelToOption(model) {
-  const id = (model.name || '').replace(/^models\//, '');
-  if (!id) return null;
-
-  const methods = model.supportedGenerationMethods ?? [];
-  if (!methods.includes('generateContent')) return null;
-
+function buildProviderCtx(providerId) {
   return {
-    id,
-    label: (model.displayName || id).trim(),
+    settings: getProviderSettings(providerId),
+    getDataPath,
+    readJSON,
   };
 }
 
-async function listAvailableModels() {
-  const auth = await getGeminiAccessToken();
-  if (!auth.ok) return FALLBACK_MODELS;
+// ---------------------------------------------------------------------------
+// Pricing (refreshed on each app open via LiteLLM catalog)
+// ---------------------------------------------------------------------------
 
-  if (modelsCache && modelsCacheKey === auth.cacheKey) return modelsCache;
+function enrichResultWithCost(providerId, model, result) {
+  if (!result.ok || result.cost != null) return result;
+  const usage = result.usage;
+  if (!usage) return result;
+  const cost = calcCost(
+    providerId,
+    model,
+    usage.promptTokenCount ?? 0,
+    usage.candidatesTokenCount ?? 0,
+  );
+  return cost != null ? { ...result, cost } : result;
+}
 
-  try {
-    const raw = await fetchAllApiModels(auth.token);
-    const models = raw
-      .map(apiModelToOption)
-      .filter(Boolean)
-      .sort((a, b) => a.label.localeCompare(b.label, 'es', { sensitivity: 'base' }));
+function getGeminiServiceAccountCreds() {
+  return readJSON(getDataPath('credentials.json'));
+}
 
-    if (models.length === 0) return FALLBACK_MODELS;
+function buildProviderStatusEntry(provider) {
+  const ctx = buildProviderCtx(provider.id);
+  const settings = ctx.settings;
+  const entry = { configured: provider.isConfigured(ctx) };
 
-    modelsCache = models;
-    modelsCacheKey = auth.cacheKey;
-    return models;
-  } catch (e) {
-    console.warn('[prompt-tester] No se pudieron listar modelos desde la API:', e.message);
-    return FALLBACK_MODELS;
+  if (settings.apiKey?.trim()) {
+    entry.maskedKey = maskApiKey(settings.apiKey);
+    if (provider.id === 'gemini') entry.authMode = 'api-key';
   }
+
+  if (provider.id === 'gemini') {
+    const creds = getGeminiServiceAccountCreds();
+    if (creds?.type === 'service_account' && !settings.apiKey?.trim()) {
+      entry.configured = true;
+      entry.authMode = 'service-account';
+      entry.projectId = creds.project_id;
+      entry.clientEmail = creds.client_email;
+      entry.maskedKey = creds.project_id ?? maskApiKey(creds.client_email ?? '');
+    }
+  }
+
+  if (settings.groupId?.trim()) entry.groupId = settings.groupId;
+
+  return entry;
 }
 
 // ---------------------------------------------------------------------------
-// Pricing (USD per 1M tokens – source: Google AI Studio pricing, Jan 2026)
-// Preview/experimental models may be free or change; values are estimates.
+// Providers IPC
 // ---------------------------------------------------------------------------
 
-const MODEL_PRICING = {
-  'gemini-2.5-flash-lite':                  { inputPerM: 0.075,   outputPerM: 0.30  },
-  'gemini-2.5-flash':                       { inputPerM: 0.30,    outputPerM: 2.50  },
-  'gemini-2.0-flash-001':                   { inputPerM: 0.075,   outputPerM: 0.30  },
-  'gemini-2.0-flash-lite-001':              { inputPerM: 0.0375,  outputPerM: 0.15  },
-  'gemini-1.5-flash-002':                   { inputPerM: 0.075,   outputPerM: 0.30  },
-  'gemini-1.5-pro-002':                     { inputPerM: 1.25,    outputPerM: 5.00  },
-};
+ipcMain.handle('providers:list', () => listProviderMeta());
 
-function calcCost(modelId, promptTokens, candidateTokens) {
-  const p = MODEL_PRICING[modelId];
-  if (!p || !promptTokens) return null;
-  return ((promptTokens    / 1_000_000) * p.inputPerM)
-       + ((candidateTokens / 1_000_000) * p.outputPerM);
-}
+ipcMain.handle('providers:status', () => {
+  const providers = {};
+  for (const meta of listProviderMeta()) {
+    const provider = getProvider(meta.id);
+    if (provider) providers[meta.id] = buildProviderStatusEntry(provider);
+  }
+  return { activeProvider: getActiveProviderId(), providers };
+});
+
+ipcMain.handle('providers:set-active', (_, providerId) => {
+  if (!getProvider(providerId)) {
+    return { ok: false, error: `Proveedor desconocido: ${providerId}` };
+  }
+  setActiveProviderId(providerId);
+  return { ok: true, activeProvider: providerId };
+});
+
+ipcMain.handle('providers:save-key', (_, { providerId, apiKey, groupId }) => {
+  const provider = getProvider(providerId);
+  if (!provider) return { ok: false, error: `Proveedor desconocido: ${providerId}` };
+
+  const trimmed = (apiKey ?? '').trim();
+  if (!trimmed) return { ok: false, error: 'API key vacía' };
+
+  const settings = { apiKey: trimmed };
+  if (groupId?.trim()) settings.groupId = groupId.trim();
+  if (providerId === 'gemini') {
+    settings.authMode = 'apiKey';
+    const credPath = getDataPath('credentials.json');
+    if (fs.existsSync(credPath)) fs.unlinkSync(credPath);
+  }
+
+  setProviderSettings(providerId, settings);
+  invalidateModelsCache(providerId);
+  return { ok: true, ...buildProviderStatusEntry(getProvider(providerId)) };
+});
+
+ipcMain.handle('providers:clear', (_, providerId) => {
+  const provider = getProvider(providerId);
+  if (!provider) return { ok: false, error: `Proveedor desconocido: ${providerId}` };
+
+  setProviderSettings(providerId, {});
+
+  if (providerId === 'gemini') {
+    const credPath = getDataPath('credentials.json');
+    if (fs.existsSync(credPath)) fs.unlinkSync(credPath);
+  }
+
+  invalidateModelsCache(providerId);
+  return { ok: true };
+});
+
+ipcMain.handle('pricing:status', () => getPricingStatus());
+
+ipcMain.handle('pricing:refresh', async () => refreshPricingOnOpen());
 
 // ---------------------------------------------------------------------------
-// Credentials IPC
+// Legacy credentials IPC (Gemini service account)
 // ---------------------------------------------------------------------------
 
 ipcMain.handle('creds:status', () => {
-  const creds = readJSON(getDataPath('credentials.json'));
-  if (!creds) return { ok: false };
-  return { ok: true, projectId: creds.project_id, clientEmail: creds.client_email };
+  const gemini = getProvider('gemini');
+  const entry = buildProviderStatusEntry(gemini);
+  if (!entry.configured) return { ok: false };
+  return {
+    ok: true,
+    projectId: entry.projectId,
+    clientEmail: entry.clientEmail,
+    authMode: entry.authMode,
+    maskedKey: entry.maskedKey,
+  };
 });
 
 ipcMain.handle('creds:select-file', async () => {
@@ -212,17 +224,6 @@ ipcMain.handle('creds:save-json', (_, jsonStr) => {
   }
 });
 
-ipcMain.handle('creds:clear', () => {
-  try {
-    const p = getDataPath('credentials.json');
-    if (fs.existsSync(p)) fs.unlinkSync(p);
-    invalidateModelsCache();
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, error: e.message };
-  }
-});
-
 function saveCredentialsFromFile(filePath) {
   try {
     const creds = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
@@ -237,73 +238,52 @@ function validateAndSaveCredentials(creds) {
     return { ok: false, error: 'No es un archivo de Service Account válido (falta "type":"service_account")' };
   }
   writeJSON(getDataPath('credentials.json'), creds);
-  invalidateModelsCache();
-  return { ok: true, projectId: creds.project_id, clientEmail: creds.client_email };
+  setProviderSettings('gemini', { authMode: 'serviceAccount', apiKey: '' });
+  invalidateModelsCache('gemini');
+  return {
+    ok: true,
+    projectId: creds.project_id,
+    clientEmail: creds.client_email,
+    authMode: 'service-account',
+  };
 }
+
+ipcMain.handle('creds:clear', () => {
+  try {
+    setProviderSettings('gemini', {});
+    const p = getDataPath('credentials.json');
+    if (fs.existsSync(p)) fs.unlinkSync(p);
+    invalidateModelsCache('gemini');
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
 
 // ---------------------------------------------------------------------------
 // Models IPC
 // ---------------------------------------------------------------------------
 
-ipcMain.handle('models:list', () => listAvailableModels());
+ipcMain.handle('models:list', (_, providerId) => {
+  const id = providerId || getActiveProviderId();
+  const provider = getProvider(id);
+  if (!provider) return [];
+  return listModelsForProvider(id, getDataPath, readJSON);
+});
 
 // ---------------------------------------------------------------------------
-// Gemini API IPC
+// LLM IPC (multi-provider)
 // ---------------------------------------------------------------------------
 
-ipcMain.handle('gemini:call', async (_, { model, prompt, data, temperature }) => {
-  const auth = await getGeminiAccessToken();
-  if (!auth.ok) return { ok: false, error: auth.error };
+ipcMain.handle('llm:call', async (_, { provider, model, prompt, data, temperature }) => {
+  const providerId = provider || getActiveProviderId();
+  const result = await callProvider(providerId, { model, prompt, data, temperature }, getDataPath, readJSON);
+  return enrichResultWithCost(providerId, model, result);
+});
 
-  try {
-    const accessToken = auth.token;
-
-    const requestBody = {
-      contents: [{ role: 'user', parts: [{ text: data || '' }] }],
-      generationConfig: { maxOutputTokens: 65535, temperature: temperature ?? 1, topP: 0.95 },
-      safetySettings: [
-        { category: 'HARM_CATEGORY_HATE_SPEECH',        threshold: 'OFF' },
-        { category: 'HARM_CATEGORY_DANGEROUS_CONTENT',  threshold: 'OFF' },
-        { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',  threshold: 'OFF' },
-        { category: 'HARM_CATEGORY_HARASSMENT',         threshold: 'OFF' },
-      ],
-    };
-
-    if (prompt?.trim()) {
-      requestBody.systemInstruction = { parts: [{ text: prompt }] };
-    }
-
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify(requestBody),
-      }
-    );
-
-    if (!res.ok) {
-      const errBody = await res.text();
-      return { ok: false, error: `HTTP ${res.status}: ${errBody}` };
-    }
-
-    const json = await res.json();
-
-    const finishReason = json.candidates?.[0]?.finishReason;
-    let text = '';
-    if (json.candidates?.[0]?.content?.parts) {
-      text = json.candidates[0].content.parts.map(p => p.text || '').join('');
-    }
-
-    const usage = json.usageMetadata ?? null;
-    const cost  = calcCost(model, usage?.promptTokenCount ?? 0, usage?.candidatesTokenCount ?? 0);
-    return { ok: true, text, finishReason, usage, cost };
-  } catch (e) {
-    return { ok: false, error: e.message };
-  }
+ipcMain.handle('gemini:call', async (_, args) => {
+  const result = await callProvider('gemini', args, getDataPath, readJSON);
+  return enrichResultWithCost('gemini', args.model, result);
 });
 
 // ---------------------------------------------------------------------------
@@ -316,7 +296,7 @@ ipcMain.handle('output:save-file', async (_, { text, defaultName }) => {
     defaultPath: defaultName ?? 'resultado.md',
     filters: [
       { name: 'Markdown', extensions: ['md'] },
-      { name: 'Texto',    extensions: ['txt'] },
+      { name: 'Texto', extensions: ['txt'] },
     ],
   });
   if (canceled || !filePath) return { ok: false };
@@ -334,13 +314,14 @@ ipcMain.handle('output:save-file', async (_, { text, defaultName }) => {
 
 ipcMain.handle('prompts:list', () => readJSON(getDataPath('saved-prompts.json')) ?? []);
 
-ipcMain.handle('prompts:save', (_, { name, prompt, data, model, temperature, responses }) => {
+ipcMain.handle('prompts:save', (_, { name, prompt, data, model, provider, temperature, responses }) => {
   const saved = readJSON(getDataPath('saved-prompts.json')) ?? [];
   const idx = saved.findIndex(p => p.name === name);
   const entry = {
     name,
     prompt,
     data,
+    provider:    provider    ?? getActiveProviderId(),
     model:       model       ?? null,
     temperature: temperature ?? null,
     responses:   Array.isArray(responses) ? responses : [],
@@ -382,7 +363,11 @@ function createWindow() {
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(async () => {
+  initPricing({ getDataPath, readJSON, writeJSON });
+  createWindow();
+  refreshPricingOnOpen().catch(() => {});
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();

@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  const PROMPT_COACH_SYSTEM = `You are a senior prompt engineer. The user tests prompts in a desktop "Prompt Tester" that calls **Google Gemini** via \`generateContent\`: optional **systemInstruction** plus a single user **data** message. Your job is to tighten that pairing and sampling so the next run better matches their intent.
+  const PROMPT_COACH_SYSTEM = `You are a senior prompt engineer. The user tests prompts in a desktop "Prompt Tester" that calls LLM APIs (OpenAI, Anthropic, Gemini, MiniMax, Mistral, Groq, DeepSeek, etc.) with optional **systemInstruction** / system prompt plus a single user **data** message. Your job is to tighten that pairing and sampling so the next run better matches their intent.
 
 ## Input contract (each user message you see)
 Structured Markdown sections, not free chat. Treat them as ground truth:
@@ -239,10 +239,18 @@ ${userLine}`;
       return;
     }
 
-    const status = await window.api.getCredsStatus();
-    if (!status.ok) {
-      p.toast('Configura credenciales primero');
-      p.openCredsModal();
+    const status = typeof window.api.getProvidersStatus === 'function'
+      ? await window.api.getProvidersStatus()
+      : await window.api.getCredsStatus().then(legacy => ({
+          activeProvider: 'gemini',
+          providers: { gemini: legacy.ok ? { configured: true } : { configured: false } },
+        }));
+
+    const provider = p.getActiveProviderId?.() ?? p.providerSelect?.value ?? status.activeProvider ?? 'gemini';
+    const pinfo = status.providers?.[provider];
+    if (!pinfo?.configured && !pinfo?.ok) {
+      p.toast('Configura la API key del proveedor primero');
+      p.openCredsModal(provider);
       return;
     }
 
@@ -263,7 +271,11 @@ ${userLine}`;
 
     try {
       const payload = buildCoachPayload(line);
-      const result = await window.api.callGemini({
+      const callFn = typeof window.api.callLLM === 'function'
+        ? window.api.callLLM.bind(window.api)
+        : window.api.callGemini.bind(window.api);
+      const result = await callFn({
+        provider,
         model,
         prompt: PROMPT_COACH_SYSTEM,
         data: payload,

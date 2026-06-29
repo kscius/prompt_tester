@@ -1,0 +1,218 @@
+const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
+
+const fallbackModels = [
+  { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite' },
+  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+  { id: 'gemini-2.0-flash-001', label: 'Gemini 2.0 Flash (001)' },
+  { id: 'gemini-2.0-flash-lite-001', label: 'Gemini 2.0 Flash Lite (001)' },
+  { id: 'gemini-1.5-flash-002', label: 'Gemini 1.5 Flash (002)' },
+  { id: 'gemini-1.5-pro-002', label: 'Gemini 1.5 Pro (002)' },
+];
+
+function usesApiKey(ctx) {
+  const mode = ctx.settings?.authMode;
+  if (mode === 'serviceAccount') return false;
+  if (mode === 'apiKey') return true;
+  return Boolean(ctx.settings?.apiKey?.trim());
+}
+
+function isConfigured(ctx) {
+  if (usesApiKey(ctx)) return Boolean(ctx.settings?.apiKey?.trim());
+  const creds = ctx.readJSON(ctx.getDataPath('credentials.json'));
+  return Boolean(creds?.type === 'service_account');
+}
+
+async function getServiceAccountAccessToken(ctx) {
+  const creds = ctx.readJSON(ctx.getDataPath('credentials.json'));
+  if (!creds) {
+    return { ok: false, error: 'Sin credenciales configuradas. Configúralas en el botón de credenciales.' };
+  }
+
+  const { GoogleAuth } = await import('google-auth-library');
+  const auth = new GoogleAuth({
+    credentials: creds,
+    scopes: [
+      'https://www.googleapis.com/auth/cloud-platform',
+      'https://www.googleapis.com/auth/generative-language',
+    ],
+  });
+
+  const client = await auth.getClient();
+  const tokenResult = await client.getAccessToken();
+  const accessToken = tokenResult.token;
+  if (!accessToken) {
+    return { ok: false, error: 'No se pudo obtener el token de acceso.' };
+  }
+
+  return {
+    ok: true,
+    token: accessToken,
+    cacheKey: creds.client_email ?? creds.project_id ?? 'default',
+  };
+}
+
+async function getApiKeyAuth(ctx) {
+  const apiKey = ctx.settings?.apiKey?.trim();
+  if (!apiKey) {
+    return { ok: false, error: 'Sin API key de Gemini configurada.' };
+  }
+  return { ok: true, apiKey, cacheKey: `apiKey:${apiKey.slice(0, 8)}` };
+}
+
+async function resolveAuth(ctx) {
+  if (usesApiKey(ctx)) return getApiKeyAuth(ctx);
+  return getServiceAccountAccessToken(ctx);
+}
+
+function buildAuthHeaders(auth) {
+  if (auth.apiKey) {
+    return { 'x-goog-api-key': auth.apiKey };
+  }
+  return { Authorization: `Bearer ${auth.token}` };
+}
+
+function buildModelUrl(path, auth) {
+  const url = new URL(`${BASE_URL}${path}`);
+  if (auth.apiKey) url.searchParams.set('key', auth.apiKey);
+  return url.toString();
+}
+
+async function fetchAllApiModels(auth) {
+  const collected = [];
+  let pageToken;
+
+  do {
+    const url = new URL(`${BASE_URL}/models`);
+    url.searchParams.set('pageSize', '1000');
+    if (pageToken) url.searchParams.set('pageToken', pageToken);
+    if (auth.apiKey) url.searchParams.set('key', auth.apiKey);
+
+    const res = await fetch(url.toString(), {
+      headers: buildAuthHeaders(auth),
+    });
+
+    if (!res.ok) {
+      const errBody = await res.text();
+      throw new Error(`HTTP ${res.status}: ${errBody}`);
+    }
+
+    const json = await res.json();
+    if (Array.isArray(json.models)) collected.push(...json.models);
+    pageToken = json.nextPageToken;
+  } while (pageToken);
+
+  return collected;
+}
+
+function apiModelToOption(model) {
+  const id = (model.name || '').replace(/^models\//, '');
+  if (!id) return null;
+
+  const methods = model.supportedGenerationMethods ?? [];
+  if (!methods.includes('generateContent')) return null;
+
+  return {
+    id,
+    label: (model.displayName || id).trim(),
+  };
+}
+
+async function listModels(ctx) {
+  const auth = await resolveAuth(ctx);
+  if (!auth.ok) return fallbackModels;
+
+  try {
+    const raw = await fetchAllApiModels(auth);
+    const models = raw
+      .map(apiModelToOption)
+      .filter(Boolean)
+      .sort((a, b) => a.label.localeCompare(b.label, 'es', { sensitivity: 'base' }));
+
+    return models.length > 0 ? models : fallbackModels;
+  } catch (e) {
+    console.warn('[gemini] No se pudieron listar modelos desde la API:', e.message);
+    return fallbackModels;
+  }
+}
+
+function mapUsage(usageMetadata) {
+  if (!usageMetadata) return null;
+  return {
+    promptTokenCount: usageMetadata.promptTokenCount ?? 0,
+    candidatesTokenCount: usageMetadata.candidatesTokenCount ?? 0,
+    totalTokenCount: usageMetadata.totalTokenCount ?? 0,
+  };
+}
+
+async function generate(ctx, { model, prompt, data, temperature }) {
+  const auth = await resolveAuth(ctx);
+  if (!auth.ok) return { ok: false, error: auth.error };
+
+  const requestBody = {
+    contents: [{ role: 'user', parts: [{ text: data || '' }] }],
+    generationConfig: { maxOutputTokens: 65535, temperature: temperature ?? 1, topP: 0.95 },
+    safetySettings: [
+      { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'OFF' },
+      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'OFF' },
+      { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'OFF' },
+      { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'OFF' },
+    ],
+  };
+
+  if (prompt?.trim()) {
+    requestBody.systemInstruction = { parts: [{ text: prompt }] };
+  }
+
+  try {
+    const res = await fetch(buildModelUrl(`/models/${model}:generateContent`, auth), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...buildAuthHeaders(auth),
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!res.ok) {
+      const errBody = await res.text();
+      return { ok: false, error: `HTTP ${res.status}: ${errBody}` };
+    }
+
+    const json = await res.json();
+    const finishReason = json.candidates?.[0]?.finishReason ?? null;
+    let text = '';
+    if (json.candidates?.[0]?.content?.parts) {
+      text = json.candidates[0].content.parts.map((p) => p.text || '').join('');
+    }
+
+    return {
+      ok: true,
+      text,
+      finishReason,
+      usage: mapUsage(json.usageMetadata),
+      cost: null,
+    };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+function getModelsCacheKey(ctx) {
+  if (usesApiKey(ctx)) {
+    const apiKey = ctx.settings?.apiKey?.trim() ?? '';
+    return `apiKey:${apiKey.slice(0, 8)}`;
+  }
+  const creds = ctx.readJSON(ctx.getDataPath('credentials.json'));
+  return creds?.client_email ?? creds?.project_id ?? 'default';
+}
+
+module.exports = {
+  id: 'gemini',
+  label: 'Google Gemini',
+  authType: 'dual',
+  fallbackModels,
+  isConfigured,
+  listModels,
+  generate,
+  getModelsCacheKey,
+};
