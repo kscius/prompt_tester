@@ -71,9 +71,14 @@ async function listModelsForProvider(providerId, getDataPath, readJSON) {
   const cached = modelsCache.get(providerId);
   if (cached && cached.cacheKey === cacheKey) return cached.models;
 
-  const models = await provider.listModels(ctx);
-  modelsCache.set(providerId, { cacheKey, models });
-  return models;
+  try {
+    const models = await provider.listModels(ctx);
+    modelsCache.set(providerId, { cacheKey, models });
+    return models;
+  } catch (e) {
+    console.warn(`[registry] listModels falló para ${providerId}:`, e.message);
+    return provider.fallbackModels ?? [];
+  }
 }
 
 async function callProvider(providerId, args, getDataPath, readJSON) {

@@ -157,11 +157,24 @@ function getMaskedLabel(info) {
 
 // ─── Initialise ──────────────────────────────────────────────────────────────
 async function init() {
-  renderProvidersModal();
-  await loadProviders();
-  await Promise.all([loadModels(), refreshCredsStatus(), loadSavedPrompts(), loadPricingStatus()]);
-  updateCounts();
-  schedulePricingStatusPoll();
+  try {
+    renderProvidersModal();
+    await loadProviders();
+    const results = await Promise.allSettled([
+      loadModels(),
+      refreshCredsStatus(),
+      loadSavedPrompts(),
+      loadPricingStatus(),
+    ]);
+    for (const r of results) {
+      if (r.status === 'rejected') console.error('[init]', r.reason);
+    }
+    updateCounts();
+    schedulePricingStatusPoll();
+  } catch (e) {
+    console.error('[init] Error fatal:', e);
+    toast('Error al iniciar la aplicación. Revisa la consola.');
+  }
 }
 
 async function loadPricingStatus() {
@@ -239,15 +252,21 @@ async function loadProviders() {
 async function loadModels() {
   const previous = modelSelect.value;
   const providerId = getActiveProviderId();
-  const models = await fetchModels(providerId);
-  modelSelect.innerHTML = (models ?? [])
-    .map(m => `<option value="${esc(m.id)}">${esc(m.label)}</option>`)
-    .join('');
-  if (!modelSelect.options.length) {
+  try {
+    const models = await fetchModels(providerId);
+    modelSelect.innerHTML = (models ?? [])
+      .map(m => `<option value="${esc(m.id)}">${esc(m.label)}</option>`)
+      .join('');
+    if (!modelSelect.options.length) {
+      modelSelect.innerHTML = '<option value="">Sin modelos disponibles</option>';
+    }
+    if (previous && [...modelSelect.options].some(o => o.value === previous)) {
+      modelSelect.value = previous;
+    }
+  } catch (e) {
+    console.error('[loadModels]', e);
     modelSelect.innerHTML = '<option value="">Sin modelos disponibles</option>';
-  }
-  if (previous && [...modelSelect.options].some(o => o.value === previous)) {
-    modelSelect.value = previous;
+    toast('No se pudieron cargar modelos; usando lista vacía.');
   }
 }
 
@@ -519,9 +538,14 @@ async function clearProviderKey(providerId) {
 async function importServiceAccountFile() {
   const result = await window.api.selectCredsFile();
   if (result?.ok) {
-    await refreshCredsStatus();
-    await loadModels();
-    toast('Service Account importado');
+    try {
+      await refreshCredsStatus();
+      await loadModels();
+      toast('Service Account importado');
+    } catch (e) {
+      console.error('[importServiceAccountFile]', e);
+      toast('Service Account importado, pero falló la actualización de modelos.');
+    }
   } else if (result?.error) {
     toast(`Error: ${result.error}`);
   }
@@ -538,9 +562,14 @@ async function savePastedServiceAccount() {
   const result = await window.api.saveCredsJson(json);
   if (result?.ok) {
     if (pasteArea) pasteArea.value = '';
-    await refreshCredsStatus();
-    await loadModels();
-    toast('Service Account guardado');
+    try {
+      await refreshCredsStatus();
+      await loadModels();
+      toast('Service Account guardado');
+    } catch (e) {
+      console.error('[savePastedServiceAccount]', e);
+      toast('Service Account guardado, pero falló la actualización de modelos.');
+    }
   } else {
     toast(`Error: ${result?.error ?? 'JSON inválido'}`);
   }
@@ -1072,4 +1101,4 @@ window.promptTester = {
   openCredsModal,
   getActiveProviderId,
 };
-init();
+init().catch((e) => console.error('[init] No capturado:', e));
