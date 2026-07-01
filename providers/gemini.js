@@ -25,32 +25,37 @@ function isConfigured(ctx) {
 }
 
 async function getServiceAccountAccessToken(ctx) {
-  const creds = ctx.readJSON(ctx.getDataPath('credentials.json'));
-  if (!creds) {
-    return { ok: false, error: 'Sin credenciales configuradas. Configúralas en el botón de credenciales.' };
+  try {
+    const creds = ctx.readJSON(ctx.getDataPath('credentials.json'));
+    if (!creds) {
+      return { ok: false, error: 'Sin credenciales configuradas. Configúralas en el botón de credenciales.' };
+    }
+
+    const { GoogleAuth } = await import('google-auth-library');
+    const auth = new GoogleAuth({
+      credentials: creds,
+      scopes: [
+        'https://www.googleapis.com/auth/cloud-platform',
+        'https://www.googleapis.com/auth/generative-language',
+      ],
+    });
+
+    const client = await auth.getClient();
+    const tokenResult = await client.getAccessToken();
+    const accessToken = tokenResult.token;
+    if (!accessToken) {
+      return { ok: false, error: 'No se pudo obtener el token de acceso.' };
+    }
+
+    return {
+      ok: true,
+      token: accessToken,
+      cacheKey: creds.client_email ?? creds.project_id ?? 'default',
+    };
+  } catch (e) {
+    console.warn('[gemini] Error obteniendo token de Service Account:', e.message);
+    return { ok: false, error: e.message || 'No se pudo autenticar con Service Account.' };
   }
-
-  const { GoogleAuth } = await import('google-auth-library');
-  const auth = new GoogleAuth({
-    credentials: creds,
-    scopes: [
-      'https://www.googleapis.com/auth/cloud-platform',
-      'https://www.googleapis.com/auth/generative-language',
-    ],
-  });
-
-  const client = await auth.getClient();
-  const tokenResult = await client.getAccessToken();
-  const accessToken = tokenResult.token;
-  if (!accessToken) {
-    return { ok: false, error: 'No se pudo obtener el token de acceso.' };
-  }
-
-  return {
-    ok: true,
-    token: accessToken,
-    cacheKey: creds.client_email ?? creds.project_id ?? 'default',
-  };
 }
 
 async function getApiKeyAuth(ctx) {
