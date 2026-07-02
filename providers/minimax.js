@@ -30,7 +30,10 @@ async function listModels(ctx) {
     const res = await fetch(`${BASE_URL}/models`, {
       headers: authHeaders(ctx),
     });
-    if (!res.ok) return fallbackModels;
+    if (!res.ok) {
+      const errBody = await res.text();
+      throw new Error(formatHttpError(res.status, errBody, 'minimax'));
+    }
 
     const json = await res.json();
     const raw = json.data ?? json.models ?? json.base_resp?.data ?? [];
@@ -48,7 +51,7 @@ async function listModels(ctx) {
     return models.length > 0 ? models : fallbackModels;
   } catch (e) {
     console.warn('[minimax] No se pudieron listar modelos:', e.message);
-    return fallbackModels;
+    throw e;
   }
 }
 

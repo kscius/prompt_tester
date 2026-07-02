@@ -23,7 +23,10 @@ async function listModels(ctx) {
     const res = await fetch(`${BASE_URL}/models`, {
       headers: { Authorization: `Bearer ${apiKey}` },
     });
-    if (!res.ok) return fallbackModels;
+    if (!res.ok) {
+      const errBody = await res.text();
+      throw new Error(formatHttpError(res.status, errBody, 'deepseek'));
+    }
 
     const json = await res.json();
     const models = (json.data ?? [])
@@ -34,7 +37,7 @@ async function listModels(ctx) {
     return models.length > 0 ? models : fallbackModels;
   } catch (e) {
     console.warn('[deepseek] No se pudieron listar modelos:', e.message);
-    return fallbackModels;
+    throw e;
   }
 }
 

@@ -267,7 +267,7 @@ ipcMain.handle('creds:clear', () => {
 ipcMain.handle('models:list', (_, providerId) => {
   const id = providerId || getActiveProviderId();
   const provider = getProvider(id);
-  if (!provider) return [];
+  if (!provider) return { models: [], warning: null };
   return listModelsForProvider(id, getDataPath, readJSON);
 });
 

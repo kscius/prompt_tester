@@ -64,20 +64,26 @@ function invalidateModelsCache(providerId) {
 
 async function listModelsForProvider(providerId, getDataPath, readJSON) {
   const provider = getProvider(providerId);
-  if (!provider) return [];
+  if (!provider) return { models: [], warning: null };
 
   const ctx = buildProviderCtx(providerId, getDataPath, readJSON);
   const cacheKey = buildModelsCacheKey(provider, ctx);
   const cached = modelsCache.get(providerId);
-  if (cached && cached.cacheKey === cacheKey) return cached.models;
+  if (cached && cached.cacheKey === cacheKey) {
+    return { models: cached.models, warning: null };
+  }
 
   try {
     const models = await provider.listModels(ctx);
     modelsCache.set(providerId, { cacheKey, models });
-    return models;
+    return { models, warning: null };
   } catch (e) {
-    console.warn(`[registry] listModels falló para ${providerId}:`, e.message);
-    return provider.fallbackModels ?? [];
+    const message = e?.message || 'No se pudieron listar modelos desde la API.';
+    console.warn(`[registry] listModels falló para ${providerId}:`, message);
+    return {
+      models: provider.fallbackModels ?? [],
+      warning: message,
+    };
   }
 }
 

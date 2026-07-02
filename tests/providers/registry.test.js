@@ -36,20 +36,22 @@ describe('providers/registry', () => {
       throw new Error('auth exploded');
     };
 
-    const models = await listModelsForProvider('groq', noopIO.getDataPath, noopIO.readJSON);
-    assert.deepEqual(models, groq.fallbackModels);
+    const result = await listModelsForProvider('groq', noopIO.getDataPath, noopIO.readJSON);
+    assert.deepEqual(result.models, groq.fallbackModels);
+    assert.equal(result.warning, 'auth exploded');
   });
 
   it('returns empty array for unknown provider', async () => {
-    const models = await listModelsForProvider('nonexistent', noopIO.getDataPath, noopIO.readJSON);
-    assert.deepEqual(models, []);
+    const result = await listModelsForProvider('nonexistent', noopIO.getDataPath, noopIO.readJSON);
+    assert.deepEqual(result, { models: [], warning: null });
   });
 
   it('returns fallback models for unconfigured groq without network', async () => {
-    const models = await listModelsForProvider('groq', noopIO.getDataPath, noopIO.readJSON);
-    assert.ok(Array.isArray(models));
-    assert.ok(models.length > 0);
-    assert.ok(models.every((m) => m.id && m.label));
+    const result = await listModelsForProvider('groq', noopIO.getDataPath, noopIO.readJSON);
+    assert.ok(Array.isArray(result.models));
+    assert.ok(result.models.length > 0);
+    assert.ok(result.models.every((m) => m.id && m.label));
+    assert.equal(result.warning, null);
   });
 
   it('caches listModels result for the same provider', async () => {
@@ -64,7 +66,8 @@ describe('providers/registry', () => {
 
     assert.equal(calls, 1);
     assert.deepEqual(second, first);
-    assert.equal(first[0].id, 'cached-model');
+    assert.equal(first.models[0].id, 'cached-model');
+    assert.equal(first.warning, null);
   });
 
   it('re-fetches models after invalidateModelsCache', async () => {
@@ -76,10 +79,10 @@ describe('providers/registry', () => {
 
     await listModelsForProvider('groq', noopIO.getDataPath, noopIO.readJSON);
     invalidateModelsCache('groq');
-    const models = await listModelsForProvider('groq', noopIO.getDataPath, noopIO.readJSON);
+    const result = await listModelsForProvider('groq', noopIO.getDataPath, noopIO.readJSON);
 
     assert.equal(calls, 2);
-    assert.equal(models[0].id, 'model-2');
+    assert.equal(result.models[0].id, 'model-2');
   });
 });
 
