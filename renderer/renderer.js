@@ -253,7 +253,11 @@ async function loadModels() {
   const previous = modelSelect.value;
   const providerId = getActiveProviderId();
   try {
-    const models = await fetchModels(providerId);
+    const result = await fetchModels(providerId);
+    const models = Array.isArray(result) ? result : (result?.models ?? []);
+    if (result?.warning) {
+      toast(`Lista de respaldo: ${result.warning}`);
+    }
     modelSelect.innerHTML = (models ?? [])
       .map(m => `<option value="${esc(m.id)}">${esc(m.label)}</option>`)
       .join('');

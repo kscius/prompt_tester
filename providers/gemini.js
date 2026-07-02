@@ -138,7 +138,7 @@ async function listModels(ctx) {
     return models.length > 0 ? models : fallbackModels;
   } catch (e) {
     console.warn('[gemini] No se pudieron listar modelos desde la API:', e.message);
-    return fallbackModels;
+    throw e;
   }
 }
 
