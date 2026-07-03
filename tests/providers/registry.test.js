@@ -1,5 +1,6 @@
 const { describe, it, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
+const gemini = require('../../providers/gemini');
 const groq = require('../../providers/groq');
 const {
   listModelsForProvider,
@@ -52,6 +53,13 @@ describe('providers/registry', () => {
     assert.ok(result.models.length > 0);
     assert.ok(result.models.every((m) => m.id && m.label));
     assert.equal(result.warning, null);
+  });
+
+  it('surfaces gemini auth failure with fallback models and warning', async () => {
+    invalidateModelsCache('gemini');
+    const result = await listModelsForProvider('gemini', noopIO.getDataPath, noopIO.readJSON);
+    assert.deepEqual(result.models, gemini.fallbackModels);
+    assert.match(result.warning, /credenciales/i);
   });
 
   it('caches listModels result for the same provider', async () => {
