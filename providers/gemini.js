@@ -126,7 +126,7 @@ function apiModelToOption(model) {
 
 async function listModels(ctx) {
   const auth = await resolveAuth(ctx);
-  if (!auth.ok) return fallbackModels;
+  if (!auth.ok) throw new Error(auth.error);
 
   try {
     const raw = await fetchAllApiModels(auth);
