@@ -33,6 +33,7 @@ describe('providers/registry', () => {
   });
 
   it('returns fallback models when listModels throws', async () => {
+    groq.isConfigured = () => true;
     groq.listModels = async () => {
       throw new Error('auth exploded');
     };
@@ -47,22 +48,26 @@ describe('providers/registry', () => {
     assert.deepEqual(result, { models: [], warning: null });
   });
 
-  it('returns fallback models for unconfigured groq without network', async () => {
+  it('returns fallback models with warning for unconfigured groq without network', async () => {
     const result = await listModelsForProvider('groq', noopIO.getDataPath, noopIO.readJSON);
     assert.ok(Array.isArray(result.models));
     assert.ok(result.models.length > 0);
     assert.ok(result.models.every((m) => m.id && m.label));
-    assert.equal(result.warning, null);
+    assert.deepEqual(result.models, groq.fallbackModels);
+    assert.match(result.warning, /no está configurado/i);
+    assert.match(result.warning, /credenciales/i);
   });
 
-  it('surfaces gemini auth failure with fallback models and warning', async () => {
+  it('surfaces gemini unconfigured state with fallback models and warning', async () => {
     invalidateModelsCache('gemini');
     const result = await listModelsForProvider('gemini', noopIO.getDataPath, noopIO.readJSON);
     assert.deepEqual(result.models, gemini.fallbackModels);
+    assert.match(result.warning, /Gemini no está configurado/i);
     assert.match(result.warning, /credenciales/i);
   });
 
   it('caches listModels result for the same provider', async () => {
+    groq.isConfigured = () => true;
     let calls = 0;
     groq.listModels = async () => {
       calls += 1;
@@ -79,6 +84,7 @@ describe('providers/registry', () => {
   });
 
   it('re-fetches models after invalidateModelsCache', async () => {
+    groq.isConfigured = () => true;
     let calls = 0;
     groq.listModels = async () => {
       calls += 1;

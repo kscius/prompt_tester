@@ -67,6 +67,14 @@ async function listModelsForProvider(providerId, getDataPath, readJSON) {
   if (!provider) return { models: [], warning: null };
 
   const ctx = buildProviderCtx(providerId, getDataPath, readJSON);
+
+  if (!provider.isConfigured(ctx)) {
+    return {
+      models: provider.fallbackModels ?? [],
+      warning: `${provider.label} no está configurado. Configura las credenciales en «Proveedores y API Keys».`,
+    };
+  }
+
   const cacheKey = buildModelsCacheKey(provider, ctx);
   const cached = modelsCache.get(providerId);
   if (cached && cached.cacheKey === cacheKey) {
