@@ -664,7 +664,8 @@ async function loadPreset(name) {
   }
 
   if (Array.isArray(p.responses) && p.responses.length) {
-    responseHistory = p.responses.slice();
+    responseHistory.length = 0;
+    responseHistory.push(...p.responses);
     renderHistory();
   }
 
@@ -922,9 +923,12 @@ exportBtn.addEventListener('click', async () => {
 
 clearOutputBtn.addEventListener('click', () => {
   lastRawText     = '';
-  responseHistory = [];
+  responseHistory.length = 0;
+  sessionCostUSD  = 0;
   renderHistory();
   costInfo.textContent = '';
+  sessionCostEl.textContent = '';
+  sessionCostEl.classList.add('hidden');
   outputMeta.classList.add('hidden');
 });
 
@@ -934,9 +938,12 @@ clearAllBtn.addEventListener('click', () => {
   saveNameInput.value = '';
   updateCounts();
   lastRawText     = '';
-  responseHistory = [];
+  responseHistory.length = 0;
+  sessionCostUSD  = 0;
   renderHistory();
   costInfo.textContent = '';
+  sessionCostEl.textContent = '';
+  sessionCostEl.classList.add('hidden');
   outputMeta.classList.add('hidden');
   toast('Limpiado');
 });
