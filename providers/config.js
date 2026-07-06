@@ -29,7 +29,13 @@ function readProviderConfig() {
 }
 
 function writeProviderConfig(config) {
-  fs.writeFileSync(getProviderConfigPath(), JSON.stringify(config, null, 2), 'utf-8');
+  try {
+    fs.writeFileSync(getProviderConfigPath(), JSON.stringify(config, null, 2), 'utf-8');
+  } catch (e) {
+    const err = new Error(`No se pudo guardar la configuración de proveedores: ${e.message}`);
+    err.cause = e;
+    throw err;
+  }
 }
 
 function getProviderSettings(providerId) {

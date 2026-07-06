@@ -68,7 +68,13 @@ function readJSON(filePath) {
 }
 
 function writeJSON(filePath, data) {
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+  try {
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+  } catch (e) {
+    const err = new Error(`No se pudo guardar ${path.basename(filePath)}: ${e.message}`);
+    err.cause = e;
+    throw err;
+  }
 }
 
 function buildProviderCtx(providerId) {
@@ -145,43 +151,55 @@ ipcMain.handle('providers:set-active', (_, providerId) => {
   if (!getProvider(providerId)) {
     return { ok: false, error: `Proveedor desconocido: ${providerId}` };
   }
-  setActiveProviderId(providerId);
-  return { ok: true, activeProvider: providerId };
+  try {
+    setActiveProviderId(providerId);
+    return { ok: true, activeProvider: providerId };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
 });
 
 ipcMain.handle('providers:save-key', (_, { providerId, apiKey, groupId }) => {
-  const provider = getProvider(providerId);
-  if (!provider) return { ok: false, error: `Proveedor desconocido: ${providerId}` };
+  try {
+    const provider = getProvider(providerId);
+    if (!provider) return { ok: false, error: `Proveedor desconocido: ${providerId}` };
 
-  const trimmed = (apiKey ?? '').trim();
-  if (!trimmed) return { ok: false, error: 'API key vacía' };
+    const trimmed = (apiKey ?? '').trim();
+    if (!trimmed) return { ok: false, error: 'API key vacía' };
 
-  const settings = { apiKey: trimmed };
-  if (groupId?.trim()) settings.groupId = groupId.trim();
-  if (providerId === 'gemini') {
-    settings.authMode = 'apiKey';
-    const credPath = getDataPath('credentials.json');
-    if (fs.existsSync(credPath)) fs.unlinkSync(credPath);
+    const settings = { apiKey: trimmed };
+    if (groupId?.trim()) settings.groupId = groupId.trim();
+    if (providerId === 'gemini') {
+      settings.authMode = 'apiKey';
+      const credPath = getDataPath('credentials.json');
+      if (fs.existsSync(credPath)) fs.unlinkSync(credPath);
+    }
+
+    setProviderSettings(providerId, settings);
+    invalidateModelsCache(providerId);
+    return { ok: true, ...buildProviderStatusEntry(getProvider(providerId)) };
+  } catch (e) {
+    return { ok: false, error: e.message };
   }
-
-  setProviderSettings(providerId, settings);
-  invalidateModelsCache(providerId);
-  return { ok: true, ...buildProviderStatusEntry(getProvider(providerId)) };
 });
 
 ipcMain.handle('providers:clear', (_, providerId) => {
-  const provider = getProvider(providerId);
-  if (!provider) return { ok: false, error: `Proveedor desconocido: ${providerId}` };
+  try {
+    const provider = getProvider(providerId);
+    if (!provider) return { ok: false, error: `Proveedor desconocido: ${providerId}` };
 
-  setProviderSettings(providerId, {});
+    setProviderSettings(providerId, {});
 
-  if (providerId === 'gemini') {
-    const credPath = getDataPath('credentials.json');
-    if (fs.existsSync(credPath)) fs.unlinkSync(credPath);
+    if (providerId === 'gemini') {
+      const credPath = getDataPath('credentials.json');
+      if (fs.existsSync(credPath)) fs.unlinkSync(credPath);
+    }
+
+    invalidateModelsCache(providerId);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e.message };
   }
-
-  invalidateModelsCache(providerId);
-  return { ok: true };
 });
 
 ipcMain.handle('pricing:status', () => getPricingStatus());
@@ -237,15 +255,19 @@ function validateAndSaveCredentials(creds) {
   if (creds.type !== 'service_account') {
     return { ok: false, error: 'No es un archivo de Service Account válido (falta "type":"service_account")' };
   }
-  writeJSON(getDataPath('credentials.json'), creds);
-  setProviderSettings('gemini', { authMode: 'serviceAccount', apiKey: '' });
-  invalidateModelsCache('gemini');
-  return {
-    ok: true,
-    projectId: creds.project_id,
-    clientEmail: creds.client_email,
-    authMode: 'service-account',
-  };
+  try {
+    writeJSON(getDataPath('credentials.json'), creds);
+    setProviderSettings('gemini', { authMode: 'serviceAccount', apiKey: '' });
+    invalidateModelsCache('gemini');
+    return {
+      ok: true,
+      projectId: creds.project_id,
+      clientEmail: creds.client_email,
+      authMode: 'service-account',
+    };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
 }
 
 ipcMain.handle('creds:clear', () => {
@@ -315,28 +337,36 @@ ipcMain.handle('output:save-file', async (_, { text, defaultName }) => {
 ipcMain.handle('prompts:list', () => readJSON(getDataPath('saved-prompts.json')) ?? []);
 
 ipcMain.handle('prompts:save', (_, { name, prompt, data, model, provider, temperature, responses }) => {
-  const saved = readJSON(getDataPath('saved-prompts.json')) ?? [];
-  const idx = saved.findIndex(p => p.name === name);
-  const entry = {
-    name,
-    prompt,
-    data,
-    provider:    provider    ?? getActiveProviderId(),
-    model:       model       ?? null,
-    temperature: temperature ?? null,
-    responses:   Array.isArray(responses) ? responses : [],
-    updatedAt:   new Date().toISOString(),
-  };
-  if (idx >= 0) saved[idx] = entry;
-  else saved.push(entry);
-  writeJSON(getDataPath('saved-prompts.json'), saved);
-  return saved;
+  try {
+    const saved = readJSON(getDataPath('saved-prompts.json')) ?? [];
+    const idx = saved.findIndex(p => p.name === name);
+    const entry = {
+      name,
+      prompt,
+      data,
+      provider:    provider    ?? getActiveProviderId(),
+      model:       model       ?? null,
+      temperature: temperature ?? null,
+      responses:   Array.isArray(responses) ? responses : [],
+      updatedAt:   new Date().toISOString(),
+    };
+    if (idx >= 0) saved[idx] = entry;
+    else saved.push(entry);
+    writeJSON(getDataPath('saved-prompts.json'), saved);
+    return { ok: true, prompts: saved };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
 });
 
 ipcMain.handle('prompts:delete', (_, name) => {
-  const saved = (readJSON(getDataPath('saved-prompts.json')) ?? []).filter(p => p.name !== name);
-  writeJSON(getDataPath('saved-prompts.json'), saved);
-  return saved;
+  try {
+    const saved = (readJSON(getDataPath('saved-prompts.json')) ?? []).filter(p => p.name !== name);
+    writeJSON(getDataPath('saved-prompts.json'), saved);
+    return { ok: true, prompts: saved };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
 });
 
 // ---------------------------------------------------------------------------
