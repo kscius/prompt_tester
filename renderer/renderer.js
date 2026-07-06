@@ -275,9 +275,14 @@ async function loadModels() {
 }
 
 async function refreshCredsStatus() {
-  providersStatus = await getProvidersOverview();
-  applyProviderStatusUI(providersStatus);
-  updateProviderPanels(providersStatus);
+  try {
+    providersStatus = await getProvidersOverview();
+    applyProviderStatusUI(providersStatus);
+    updateProviderPanels(providersStatus);
+  } catch (e) {
+    console.error('[refreshCredsStatus]', e);
+    toast('No se pudo actualizar el estado de proveedores.');
+  }
 }
 
 function applyProviderStatusUI(status) {
@@ -492,23 +497,28 @@ async function saveProviderKey(providerId) {
     if (groupId) payload.groupId = groupId;
   }
 
-  let result;
-  if (typeof window.api.saveProviderApiKey === 'function') {
-    result = await window.api.saveProviderApiKey(payload);
-  } else if (providerId === 'gemini') {
-    result = await window.api.saveCredsJson(JSON.stringify({ type: 'api_key', api_key: apiKey }));
-  } else {
-    toast('API de proveedores no disponible');
-    return;
-  }
+  try {
+    let result;
+    if (typeof window.api.saveProviderApiKey === 'function') {
+      result = await window.api.saveProviderApiKey(payload);
+    } else if (providerId === 'gemini') {
+      result = await window.api.saveCredsJson(JSON.stringify({ type: 'api_key', api_key: apiKey }));
+    } else {
+      toast('API de proveedores no disponible');
+      return;
+    }
 
-  if (result?.ok !== false && !result?.error) {
-    if (keyInput) keyInput.value = '';
-    await refreshCredsStatus();
-    await loadModels();
-    toast(`${getProviderDef(providerId).name} guardado`);
-  } else {
-    toast(`Error: ${result?.error ?? 'No se pudo guardar'}`);
+    if (result?.ok !== false && !result?.error) {
+      if (keyInput) keyInput.value = '';
+      await refreshCredsStatus();
+      await loadModels();
+      toast(`${getProviderDef(providerId).name} guardado`);
+    } else {
+      toast(`Error: ${result?.error ?? 'No se pudo guardar'}`);
+    }
+  } catch (e) {
+    console.error('[saveProviderKey]', e);
+    toast(`Error: ${e.message ?? 'No se pudo guardar'}`);
   }
 }
 
@@ -626,9 +636,19 @@ function renderSavedList() {
     btn.addEventListener('click', async e => {
       e.stopPropagation();
       const name = btn.dataset.name;
-      savedPrompts = await window.api.deletePrompt(name);
-      renderSavedList();
-      toast(`Eliminado: ${name}`);
+      try {
+        const result = await window.api.deletePrompt(name);
+        if (result?.ok === false) {
+          toast(`Error: ${result.error ?? 'No se pudo eliminar'}`);
+          return;
+        }
+        savedPrompts = result.prompts ?? [];
+        renderSavedList();
+        toast(`Eliminado: ${name}`);
+      } catch (err) {
+        console.error('[deletePrompt]', err);
+        toast(`Error: ${err.message ?? 'No se pudo eliminar'}`);
+      }
     });
   });
 }
@@ -905,8 +925,13 @@ copyBtn.addEventListener('click', async () => {
   const all = responseHistory
     .map((e, i) => `## Respuesta #${i + 1} — ${e.model} (temp ${parseFloat(e.temperature).toFixed(1)})\n\n${e.text}`)
     .join('\n\n---\n\n');
-  await navigator.clipboard.writeText(all);
-  toast('Historial copiado al portapapeles');
+  try {
+    await navigator.clipboard.writeText(all);
+    toast('Historial copiado al portapapeles');
+  } catch (e) {
+    console.error('[copyBtn]', e);
+    toast('No se pudo copiar al portapapeles.');
+  }
 });
 
 exportBtn.addEventListener('click', async () => {
@@ -953,17 +978,27 @@ savePresetBtn.addEventListener('click', async () => {
   const name = saveNameInput.value.trim();
   if (!name) { toast('Escribe un nombre para el preset'); return; }
 
-  savedPrompts = await window.api.savePrompt({
-    name,
-    prompt:      promptInput.value,
-    data:        dataInput.value,
-    provider:    getActiveProviderId(),
-    model:       modelSelect.value,
-    temperature: parseFloat(tempRange.value),
-    responses:   responseHistory.slice(),
-  });
-  renderSavedList();
-  toast(`Guardado: ${name}`);
+  try {
+    const result = await window.api.savePrompt({
+      name,
+      prompt:      promptInput.value,
+      data:        dataInput.value,
+      provider:    getActiveProviderId(),
+      model:       modelSelect.value,
+      temperature: parseFloat(tempRange.value),
+      responses:   responseHistory.slice(),
+    });
+    if (result?.ok === false) {
+      toast(`Error: ${result.error ?? 'No se pudo guardar'}`);
+      return;
+    }
+    savedPrompts = result.prompts ?? [];
+    renderSavedList();
+    toast(`Guardado: ${name}`);
+  } catch (e) {
+    console.error('[savePreset]', e);
+    toast(`Error: ${e.message ?? 'No se pudo guardar'}`);
+  }
 });
 
 // ─── Saved panel toggle ───────────────────────────────────────────────────────
