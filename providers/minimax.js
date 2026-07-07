@@ -36,7 +36,11 @@ async function listModels(ctx) {
     }
 
     const json = await res.json();
-    const raw = json.data ?? json.models ?? json.base_resp?.data ?? [];
+    if (json.base_resp?.status_code && json.base_resp.status_code !== 0) {
+      throw new Error(json.base_resp.status_msg || `MiniMax error ${json.base_resp.status_code}`);
+    }
+
+    const raw = json.data ?? json.models ?? [];
     const items = Array.isArray(raw) ? raw : [];
 
     const models = items
