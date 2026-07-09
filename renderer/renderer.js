@@ -600,8 +600,23 @@ providerSelect?.addEventListener('change', async () => {
 });
 
 async function loadSavedPrompts() {
-  savedPrompts = await window.api.listPrompts();
-  renderSavedList();
+  try {
+    const result = await window.api.listPrompts();
+    if (result && typeof result === 'object' && Array.isArray(result.prompts)) {
+      savedPrompts = result.prompts;
+      if (!result.ok && result.error) toast(result.error);
+    } else if (Array.isArray(result)) {
+      savedPrompts = result;
+    } else {
+      savedPrompts = [];
+    }
+    renderSavedList();
+  } catch (err) {
+    console.error('[loadSavedPrompts]', err);
+    savedPrompts = [];
+    toast('Error al cargar los presets guardados.');
+    renderSavedList();
+  }
 }
 
 // ─── Saved-prompts list rendering ────────────────────────────────────────────
