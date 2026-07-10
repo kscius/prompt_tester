@@ -11,7 +11,8 @@
     "dist:portable": "electron-builder --win portable --publish never",
     "dist:mac": "electron-builder --mac --publish never",
     "dist:linux": "electron-builder --linux --publish never",
-    "test": "node --test tests/**/*.test.js"
+    "test": "node --test tests/**/*.test.js",
+    "check:syntax": "node --check main.js preload.js providers/*.js"
   },
   "keywords": ["electron", "llm", "openai", "anthropic", "gemini", "prompt"],
   "author": "Mitzael Serna <kscius@gmail.com>",

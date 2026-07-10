@@ -25,6 +25,7 @@ const {
   inspectCredentialsFile,
   validateServiceAccountFields,
 } = require('./providers/credentials-store');
+const {
   inspectSavedPromptsFile,
   assertSavedPromptsWritable,
 } = require('./providers/saved-prompts');
