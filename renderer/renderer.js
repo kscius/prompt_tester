@@ -609,19 +609,53 @@ async function savePastedServiceAccount() {
   }
 }
 
+async function switchActiveProvider(providerId) {
+  if (typeof window.api.setActiveProvider !== 'function') {
+    providersStatus.activeProvider = providerId;
+    return true;
+  }
+  try {
+    const result = await window.api.setActiveProvider(providerId);
+    if (result?.ok === false) {
+      toast(`Error: ${result.error ?? 'No se pudo cambiar el proveedor'}`);
+      providerSelect.value = providersStatus.activeProvider ?? 'gemini';
+      return false;
+    }
+    providersStatus.activeProvider = providerId;
+    return true;
+  } catch (e) {
+    console.error('[switchActiveProvider]', e);
+    toast(`Error: ${e.message ?? 'No se pudo cambiar el proveedor'}`);
+    providerSelect.value = providersStatus.activeProvider ?? 'gemini';
+    return false;
+  }
+}
+
 providerSelect?.addEventListener('change', async () => {
   const providerId = providerSelect.value;
-  if (typeof window.api.setActiveProvider === 'function') {
-    await window.api.setActiveProvider(providerId);
-  }
-  providersStatus.activeProvider = providerId;
+  if (!(await switchActiveProvider(providerId))) return;
   await loadModels();
   await refreshCredsStatus();
 });
 
 async function loadSavedPrompts() {
-  savedPrompts = await window.api.listPrompts();
-  renderSavedList();
+  try {
+    const result = await window.api.listPrompts();
+    if (result && typeof result === 'object' && Array.isArray(result.prompts)) {
+      savedPrompts = result.prompts;
+      if (!result.ok && result.error) toast(result.error);
+    } else if (Array.isArray(result)) {
+      savedPrompts = result;
+    } else {
+      savedPrompts = [];
+    }
+    renderSavedList();
+  } catch (err) {
+    console.error('[loadSavedPrompts]', err);
+    savedPrompts = [];
+    toast('Error al cargar los presets guardados.');
+    renderSavedList();
+  }
 }
 
 // ─── Saved-prompts list rendering ────────────────────────────────────────────
@@ -685,10 +719,7 @@ async function loadPreset(name) {
     const opt = providerSelect.querySelector(`option[value="${CSS.escape(p.provider)}"]`);
     if (opt) {
       providerSelect.value = p.provider;
-      if (typeof window.api.setActiveProvider === 'function') {
-        await window.api.setActiveProvider(p.provider);
-      }
-      providersStatus.activeProvider = p.provider;
+      if (!(await switchActiveProvider(p.provider))) return;
       await loadModels();
       await refreshCredsStatus();
     }

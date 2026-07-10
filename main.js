@@ -25,6 +25,9 @@ const {
   inspectCredentialsFile,
   validateServiceAccountFields,
 } = require('./providers/credentials-store');
+  inspectSavedPromptsFile,
+  assertSavedPromptsWritable,
+} = require('./providers/saved-prompts');
 
 // ---------------------------------------------------------------------------
 // Chromium / Windows: caché en disco y GPU
@@ -352,11 +355,18 @@ ipcMain.handle('output:save-file', async (_, { text, defaultName }) => {
 // Saved Prompts IPC
 // ---------------------------------------------------------------------------
 
-ipcMain.handle('prompts:list', () => readJSON(getDataPath('saved-prompts.json')) ?? []);
+function inspectSavedPrompts() {
+  const filePath = getDataPath('saved-prompts.json');
+  return inspectSavedPromptsFile(readJSON, filePath, fs.existsSync);
+}
+
+ipcMain.handle('prompts:list', () => inspectSavedPrompts());
 
 ipcMain.handle('prompts:save', (_, { name, prompt, data, model, provider, temperature, responses }) => {
   try {
-    const saved = readJSON(getDataPath('saved-prompts.json')) ?? [];
+    const inspection = inspectSavedPrompts();
+    assertSavedPromptsWritable(inspection);
+    const saved = [...inspection.prompts];
     const idx = saved.findIndex(p => p.name === name);
     const entry = {
       name,
@@ -379,7 +389,9 @@ ipcMain.handle('prompts:save', (_, { name, prompt, data, model, provider, temper
 
 ipcMain.handle('prompts:delete', (_, name) => {
   try {
-    const saved = (readJSON(getDataPath('saved-prompts.json')) ?? []).filter(p => p.name !== name);
+    const inspection = inspectSavedPrompts();
+    assertSavedPromptsWritable(inspection);
+    const saved = inspection.prompts.filter(p => p.name !== name);
     writeJSON(getDataPath('saved-prompts.json'), saved);
     return { ok: true, prompts: saved };
   } catch (e) {

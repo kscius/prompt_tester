@@ -9,11 +9,14 @@ const DEFAULT_CONFIG = {
   providers: {},
 };
 
+let providerConfigReadFailed = false;
+
 function getProviderConfigPath() {
   return path.join(app.getPath('userData'), CONFIG_FILENAME);
 }
 
 function readProviderConfig() {
+  providerConfigReadFailed = false;
   try {
     const filePath = getProviderConfigPath();
     if (fs.existsSync(filePath)) {
@@ -24,11 +27,21 @@ function readProviderConfig() {
         providers: { ...DEFAULT_CONFIG.providers, ...(raw.providers ?? {}) },
       };
     }
-  } catch {}
+  } catch (e) {
+    providerConfigReadFailed = true;
+    console.error('[config] No se pudo leer provider-config.json:', e.message);
+  }
   return { ...DEFAULT_CONFIG };
 }
 
 function writeProviderConfig(config) {
+  if (providerConfigReadFailed) {
+    const err = new Error(
+      'No se puede guardar: provider-config.json está dañado. Renómbralo o corrígelo manualmente.',
+    );
+    err.code = 'CONFIG_READ_FAILED';
+    throw err;
+  }
   try {
     fs.writeFileSync(getProviderConfigPath(), JSON.stringify(config, null, 2), 'utf-8');
   } catch (e) {
@@ -76,4 +89,5 @@ module.exports = {
   getActiveProviderId,
   setActiveProviderId,
   maskApiKey,
+  isProviderConfigReadFailed: () => providerConfigReadFailed,
 };
