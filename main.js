@@ -22,6 +22,9 @@ const {
   getPricingStatus,
 } = require('./providers/pricing');
 const {
+  inspectCredentialsFile,
+  validateServiceAccountFields,
+} = require('./providers/credentials-store');
   inspectSavedPromptsFile,
   assertSavedPromptsWritable,
 } = require('./providers/saved-prompts');
@@ -67,7 +70,9 @@ function getDataPath(filename) {
 function readJSON(filePath) {
   try {
     if (fs.existsSync(filePath)) return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-  } catch {}
+  } catch (e) {
+    console.warn(`[readJSON] No se pudo leer ${path.basename(filePath)}:`, e.message);
+  }
   return null;
 }
 
@@ -106,8 +111,9 @@ function enrichResultWithCost(providerId, model, result) {
   return cost != null ? { ...result, cost } : result;
 }
 
-function getGeminiServiceAccountCreds() {
-  return readJSON(getDataPath('credentials.json'));
+function inspectCredentials() {
+  const filePath = getDataPath('credentials.json');
+  return inspectCredentialsFile(readJSON, filePath, fs.existsSync);
 }
 
 function buildProviderStatusEntry(provider) {
@@ -121,13 +127,20 @@ function buildProviderStatusEntry(provider) {
   }
 
   if (provider.id === 'gemini') {
-    const creds = getGeminiServiceAccountCreds();
-    if (creds?.type === 'service_account' && !settings.apiKey?.trim()) {
-      entry.configured = true;
-      entry.authMode = 'service-account';
-      entry.projectId = creds.project_id;
-      entry.clientEmail = creds.client_email;
-      entry.maskedKey = creds.project_id ?? maskApiKey(creds.client_email ?? '');
+    const inspection = inspectCredentials();
+    if (inspection.corrupt) {
+      entry.configured = false;
+      entry.credentialsCorrupt = true;
+      entry.error = inspection.error;
+    } else {
+      const creds = inspection.creds;
+      if (creds?.type === 'service_account' && !settings.apiKey?.trim()) {
+        entry.configured = true;
+        entry.authMode = 'service-account';
+        entry.projectId = creds.project_id;
+        entry.clientEmail = creds.client_email;
+        entry.maskedKey = creds.project_id ?? maskApiKey(creds.client_email ?? '');
+      }
     }
   }
 
@@ -217,6 +230,9 @@ ipcMain.handle('pricing:refresh', async () => refreshPricingOnOpen());
 ipcMain.handle('creds:status', () => {
   const gemini = getProvider('gemini');
   const entry = buildProviderStatusEntry(gemini);
+  if (entry.credentialsCorrupt) {
+    return { ok: false, credentialsCorrupt: true, error: entry.error };
+  }
   if (!entry.configured) return { ok: false };
   return {
     ok: true,
@@ -256,8 +272,9 @@ function saveCredentialsFromFile(filePath) {
 }
 
 function validateAndSaveCredentials(creds) {
-  if (creds.type !== 'service_account') {
-    return { ok: false, error: 'No es un archivo de Service Account válido (falta "type":"service_account")' };
+  const validationError = validateServiceAccountFields(creds);
+  if (validationError) {
+    return { ok: false, error: validationError };
   }
   try {
     writeJSON(getDataPath('credentials.json'), creds);

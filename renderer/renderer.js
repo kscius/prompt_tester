@@ -62,6 +62,7 @@ let lastRawText        = '';
 let sessionCostUSD     = 0;
 let responseHistory    = [];
 let providersStatus    = { activeProvider: 'gemini', providers: {} };
+let credentialsCorruptNotified = false;
 let modalProviderId    = 'gemini';
 let geminiAuthMode     = 'api-key';
 
@@ -277,6 +278,11 @@ async function loadModels() {
 async function refreshCredsStatus() {
   try {
     providersStatus = await getProvidersOverview();
+    const geminiInfo = providersStatus.providers?.gemini;
+    if (geminiInfo?.credentialsCorrupt && !credentialsCorruptNotified) {
+      toast(geminiInfo.error ?? 'credentials.json está dañado. Reimporta el Service Account.');
+      credentialsCorruptNotified = true;
+    }
     applyProviderStatusUI(providersStatus);
     updateProviderPanels(providersStatus);
   } catch (e) {
@@ -290,7 +296,10 @@ function applyProviderStatusUI(status) {
   const info = status.providers?.[active] ?? {};
   const def = getProviderDef(active);
 
-  if (isProviderConfigured(info)) {
+  if (info.credentialsCorrupt) {
+    credsDot.className = 'dot dot-error';
+    credsLabel.textContent = `${def.name} · credentials.json dañado`;
+  } else if (isProviderConfigured(info)) {
     credsDot.className = 'dot dot-success';
     credsLabel.textContent = `${def.name} · ${getMaskedLabel(info)}`;
   } else {
@@ -302,7 +311,7 @@ function applyProviderStatusUI(status) {
     const pid = tab.dataset.provider;
     const pInfo = status.providers?.[pid];
     const dot = tab.querySelector('.provider-tab-dot');
-    if (dot) dot.classList.toggle('configured', isProviderConfigured(pInfo));
+    if (dot) dot.classList.toggle('configured', isProviderConfigured(pInfo) && !pInfo?.credentialsCorrupt);
   });
 }
 
@@ -431,7 +440,10 @@ function updateProviderPanels(status) {
     const banner = document.getElementById(`status-${p.id}`);
     if (!banner) continue;
 
-    if (isProviderConfigured(info)) {
+    if (info.credentialsCorrupt) {
+      banner.className = 'provider-status-banner unconfigured';
+      banner.innerHTML = `<span class="dot dot-error"></span><span>${esc(info.error ?? 'credentials.json dañado')}</span>`;
+    } else if (isProviderConfigured(info)) {
       banner.className = 'provider-status-banner';
       const label = p.id === 'gemini' && info.authMode === 'service-account'
         ? `Service Account · ${esc(info.projectId ?? 'configurado')}`
@@ -523,35 +535,42 @@ async function saveProviderKey(providerId) {
 }
 
 async function clearProviderKey(providerId) {
-  let result;
-  if (typeof window.api.clearProvider === 'function') {
-    result = await window.api.clearProvider(providerId);
-  } else if (providerId === 'gemini' && typeof window.api.clearCreds === 'function') {
-    result = await window.api.clearCreds();
-  } else {
-    toast('API de proveedores no disponible');
-    return;
-  }
-
-  if (result?.ok !== false && !result?.error) {
-    const keyEl = document.getElementById(`key-${providerId}`);
-    if (keyEl) keyEl.value = '';
-    if (providerId === 'gemini') {
-      const pasteArea = document.getElementById('creds-paste-area');
-      if (pasteArea) pasteArea.value = '';
-      document.getElementById('gemini-sa-detail')?.classList.add('hidden');
+  try {
+    let result;
+    if (typeof window.api.clearProvider === 'function') {
+      result = await window.api.clearProvider(providerId);
+    } else if (providerId === 'gemini' && typeof window.api.clearCreds === 'function') {
+      result = await window.api.clearCreds();
+    } else {
+      toast('API de proveedores no disponible');
+      return;
     }
-    await refreshCredsStatus();
-    await loadModels();
-    toast(`${getProviderDef(providerId).name} eliminado`);
-  } else {
-    toast(`Error: ${result?.error ?? 'No se pudo eliminar'}`);
+
+    if (result?.ok !== false && !result?.error) {
+      const keyEl = document.getElementById(`key-${providerId}`);
+      if (keyEl) keyEl.value = '';
+      if (providerId === 'gemini') {
+        const pasteArea = document.getElementById('creds-paste-area');
+        if (pasteArea) pasteArea.value = '';
+        document.getElementById('gemini-sa-detail')?.classList.add('hidden');
+        credentialsCorruptNotified = false;
+      }
+      await refreshCredsStatus();
+      await loadModels();
+      toast(`${getProviderDef(providerId).name} eliminado`);
+    } else {
+      toast(`Error: ${result?.error ?? 'No se pudo eliminar'}`);
+    }
+  } catch (e) {
+    console.error('[clearProviderKey]', e);
+    toast(`Error: ${e.message ?? 'No se pudo eliminar'}`);
   }
 }
 
 async function importServiceAccountFile() {
   const result = await window.api.selectCredsFile();
   if (result?.ok) {
+    credentialsCorruptNotified = false;
     try {
       await refreshCredsStatus();
       await loadModels();
@@ -575,6 +594,7 @@ async function savePastedServiceAccount() {
 
   const result = await window.api.saveCredsJson(json);
   if (result?.ok) {
+    credentialsCorruptNotified = false;
     if (pasteArea) pasteArea.value = '';
     try {
       await refreshCredsStatus();
@@ -807,6 +827,11 @@ async function sendRequest() {
 
   const status = await getProvidersOverview();
   const pinfo = status.providers?.[provider];
+  if (pinfo?.credentialsCorrupt) {
+    toast(pinfo.error ?? 'credentials.json está dañado. Reimporta el Service Account.');
+    openCredsModal(provider);
+    return;
+  }
   if (!isProviderConfigured(pinfo)) {
     toast(`Configura la API key de ${getProviderDef(provider).name} primero`);
     openCredsModal(provider);
