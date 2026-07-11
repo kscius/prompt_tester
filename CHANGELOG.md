@@ -2,6 +2,17 @@
 
 El formato sigue una idea cercana a [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
+## [Unreleased]
+
+### Añadido
+
+- Soporte multi-proveedor: OpenAI, Anthropic, Google Gemini, MiniMax, Mistral, Groq y DeepSeek.
+- Selector de proveedor en la cabecera y modal **«Proveedores y API Keys»** para API keys (Gemini: API key o service account JSON en `credentials.json`).
+- Lista de modelos por proveedor vía API, con modelos de respaldo si la consulta falla o no hay credenciales.
+- Coste estimado por llamada y sesión usando catálogo LiteLLM (caché en `pricing-cache.json` y defaults embebidos).
+- Tests con `node:test` en `tests/providers/*.test.js` y workflow **CI** en GitHub Actions (`npm test` en push/PR a `main`).
+- Detección de archivos locales dañados (`provider-config.json`, `credentials.json`, `saved-prompts.json`) con avisos en la UI y bloqueo de escritura hasta corregirlos.
+
 ## [1.3.0] - 2026-05-20
 
 ### Cambiado
@@ -35,5 +46,7 @@ El formato sigue una idea cercana a [Keep a Changelog](https://keepachangelog.co
 - Empaquetado con electron-builder: Windows (NSIS + portable), macOS (DMG + ZIP) y Linux (AppImage + deb).
 - Mitigaciones en Windows para conflictos de caché de Chromium y bloqueo de instancia única.
 
+[Unreleased]: https://github.com/kscius/prompt_tester/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/kscius/prompt_tester/releases/tag/v1.3.0
 [1.1.0]: https://github.com/kscius/prompt_tester/releases/tag/v1.1.0
 [1.0.0]: https://github.com/kscius/prompt_tester/releases/tag/v1.0.0
