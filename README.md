@@ -1,30 +1,36 @@
 # Prompt Tester
 
-Aplicación de escritorio para probar modelos **Gemini** de Google con tus propios prompts: escribes la instrucción del sistema y los datos, eliges el modelo y ves la respuesta en Markdown. Sirve para iterar prompts sin montar un servidor aparte.
+Aplicación de escritorio para probar prompts contra varios proveedores de LLM (**OpenAI**, **Anthropic**, **Gemini**, **MiniMax**, **Mistral**, **Groq**, **DeepSeek**): escribes la instrucción del sistema y los datos, eliges proveedor y modelo, y ves la respuesta en Markdown. Sirve para iterar prompts sin montar un servidor aparte.
 
 ## Qué incluye
 
-- Importación de credenciales tipo **service account** (JSON), guardadas solo en el almacenamiento local de la app.
-- Selector de modelo (lista obtenida de la API Gemini según tus credenciales) y llamada a `generateContent`.
+- Configuración de credenciales en el modal **«Proveedores y API Keys»** (API keys por proveedor; Gemini también admite **service account** JSON). Todo se guarda solo en el almacenamiento local de la app (`userData`).
+- Selector de **proveedor** y **modelo** (lista obtenida de la API de cada proveedor cuando hay credenciales; si falla, lista de respaldo) y envío del prompt al proveedor activo.
 - Dos áreas de texto: instrucción del sistema y datos del usuario.
 - Resultado renderizado en Markdown, copiar al portapapeles y exportar a `.md`.
 - Presets: guardar y cargar combinaciones de prompt + datos.
 - Temperatura ajustable (0–2) con una nota breve sobre qué hace cada rango.
 - Tras cada respuesta: tokens, tiempo, coste estimado (según tabla de precios en la app) y acumulado de la sesión.
-- **Asistente de prompt**: panel flotante (botón redondo y acceso desde el historial) que usa Gemini con tu instrucción del sistema, datos, última respuesta del historial y temperaturas para sugerir cambios concretos en el prompt.
+- **Asistente de prompt**: panel flotante (botón redondo y acceso desde el historial) que usa el **proveedor y modelo seleccionados** con tu instrucción del sistema, datos, última respuesta del historial y temperaturas para sugerir cambios concretos en el prompt.
 
-Los importes de coste son **orientativos**; comprueba siempre la facturación en Google Cloud / AI Studio.
+Los importes de coste son **orientativos** (tabla sincronizada desde el catálogo público de LiteLLM, con valores embebidos de respaldo); comprueba siempre la facturación en el panel de tu proveedor.
 
 ## Requisitos
 
 - [Node.js](https://nodejs.org/) 20 o superior (recomendado LTS).
-- Una cuenta de servicio de Google Cloud con acceso a la API de Gemini y un archivo JSON de claves.
+- Credenciales de al menos un proveedor soportado (API key; en Gemini, API key o service account JSON con acceso a la API).
 
 ## Desarrollo
 
 ```bash
 npm install
 npm start
+```
+
+Tests (lógica de proveedores, sin Electron):
+
+```bash
+npm test
 ```
 
 Para depurar el proceso principal:
@@ -56,8 +62,8 @@ Publicar una versión en GitHub (texto del release, adjuntos) está descrito en 
 
 ## Seguridad y datos locales
 
-- Las credenciales y los presets se guardan bajo el directorio de datos de usuario de Electron (`userData`), no dentro del repositorio.
-- No subas nunca tu JSON de service account al repositorio ni lo pegues en issues públicos.
+- Credenciales, configuración de proveedores y presets se guardan bajo el directorio de datos de usuario de Electron (`userData`), no dentro del repositorio. En Linux suele ser `~/.config/Prompt Tester/` (p. ej. `provider-config.json`, `credentials.json` para Gemini service account, `saved-prompts.json`, `pricing-cache.json`).
+- No subas nunca API keys ni JSON de service account al repositorio ni los pegues en issues públicos.
 
 ## Licencia
 
