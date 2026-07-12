@@ -4,6 +4,10 @@ El formato sigue una idea cercana a [Keep a Changelog](https://keepachangelog.co
 
 ## [Unreleased]
 
+### Corregido
+
+- Gemini: respuestas bloqueadas o sin texto (`promptFeedback.blockReason`, candidatos vacíos, `finishReason` SAFETY/RECITATION) ya no se tratan como éxito silencioso.
+
 ### Añadido
 
 - Soporte multi-proveedor: OpenAI, Anthropic, Google Gemini, MiniMax, Mistral, Groq y DeepSeek.

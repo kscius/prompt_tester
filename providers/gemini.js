@@ -151,6 +151,34 @@ function mapUsage(usageMetadata) {
   };
 }
 
+function extractCandidateText(candidate) {
+  const parts = candidate?.content?.parts;
+  if (!Array.isArray(parts)) return '';
+  return parts.map((p) => p.text || '').join('');
+}
+
+function emptyGenerateError(json, finishReason) {
+  const blockReason = json?.promptFeedback?.blockReason;
+  if (blockReason) {
+    return `Contenido bloqueado por Gemini (${blockReason}).`;
+  }
+  if (finishReason === 'SAFETY') {
+    return 'Respuesta bloqueada por filtros de seguridad (SAFETY).';
+  }
+  if (finishReason === 'RECITATION') {
+    return 'Respuesta bloqueada por Gemini (RECITATION).';
+  }
+  if (finishReason === 'MAX_TOKENS') {
+    return 'Gemini alcanzó el límite de tokens sin devolver texto.';
+  }
+  if (!json?.candidates?.length) {
+    return 'Gemini no devolvió candidatos.';
+  }
+  return finishReason
+    ? `Gemini no devolvió texto (finishReason: ${finishReason}).`
+    : 'Gemini no devolvió texto en la respuesta.';
+}
+
 async function generate(ctx, { model, prompt, data, temperature }) {
   const auth = await resolveAuth(ctx);
   if (!auth.ok) return { ok: false, error: auth.error };
@@ -186,10 +214,16 @@ async function generate(ctx, { model, prompt, data, temperature }) {
     }
 
     const json = await res.json();
-    const finishReason = json.candidates?.[0]?.finishReason ?? null;
-    let text = '';
-    if (json.candidates?.[0]?.content?.parts) {
-      text = json.candidates[0].content.parts.map((p) => p.text || '').join('');
+    if (json.promptFeedback?.blockReason) {
+      return { ok: false, error: emptyGenerateError(json, null) };
+    }
+
+    const candidate = json.candidates?.[0];
+    const finishReason = candidate?.finishReason ?? null;
+    const text = extractCandidateText(candidate);
+
+    if (!text.trim()) {
+      return { ok: false, error: emptyGenerateError(json, finishReason) };
     }
 
     return {
