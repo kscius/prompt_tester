@@ -7,6 +7,7 @@ El formato sigue una idea cercana a [Keep a Changelog](https://keepachangelog.co
 ### Corregido
 
 - Gemini: respuestas bloqueadas o sin texto (`promptFeedback.blockReason`, candidatos vacíos, `finishReason` SAFETY/RECITATION) ya no se tratan como éxito silencioso.
+- OpenAI, Groq, DeepSeek, Mistral, Anthropic y MiniMax: respuestas HTTP 200 sin texto útil (`choices`/`content` vacíos) ya no se marcan como éxito silencioso.
 
 ### Añadido
 

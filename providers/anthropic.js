@@ -1,4 +1,4 @@
-const { formatHttpError } = require('./errors');
+const { formatHttpError, rejectEmptyGenerateText } = require('./errors');
 
 const BASE_URL = 'https://api.anthropic.com/v1';
 const ANTHROPIC_VERSION = '2023-06-01';
@@ -92,11 +92,14 @@ async function generate(ctx, { model, prompt, data, temperature }) {
       .filter((part) => part.type === 'text')
       .map((part) => part.text || '')
       .join('');
+    const finishReason = json.stop_reason ?? null;
+    const empty = rejectEmptyGenerateText(text, { providerId: 'anthropic', finishReason });
+    if (empty) return empty;
 
     return {
       ok: true,
       text,
-      finishReason: json.stop_reason ?? null,
+      finishReason,
       usage: mapUsage(json.usage),
       cost: null,
     };

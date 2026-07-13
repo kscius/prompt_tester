@@ -78,4 +78,33 @@ function formatHttpError(status, body, providerId) {
     : `${prefix}HTTP ${status}: Error desconocido`;
 }
 
-module.exports = { formatHttpError, extractMessage, STATUS_HINTS };
+/**
+ * Message when a provider returns HTTP 200 without usable text.
+ * @param {string} [providerId]
+ * @param {string|null} [finishReason]
+ * @returns {string}
+ */
+function emptyGenerateTextError(providerId, finishReason) {
+  const label = providerId || 'El proveedor';
+  return finishReason
+    ? `${label} no devolvió texto (finishReason: ${finishReason}).`
+    : `${label} no devolvió texto en la respuesta.`;
+}
+
+/**
+ * @param {unknown} text
+ * @param {{ providerId?: string, finishReason?: string|null }} [opts]
+ * @returns {{ ok: false, error: string }|null}
+ */
+function rejectEmptyGenerateText(text, { providerId, finishReason } = {}) {
+  if (String(text ?? '').trim()) return null;
+  return { ok: false, error: emptyGenerateTextError(providerId, finishReason) };
+}
+
+module.exports = {
+  formatHttpError,
+  extractMessage,
+  STATUS_HINTS,
+  emptyGenerateTextError,
+  rejectEmptyGenerateText,
+};
