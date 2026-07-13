@@ -1,4 +1,4 @@
-const { formatHttpError } = require('./errors');
+const { formatHttpError, rejectEmptyGenerateText } = require('./errors');
 
 const BASE_URL = 'https://api.groq.com/openai/v1';
 
@@ -80,10 +80,14 @@ async function generate(ctx, { model, prompt, data, temperature }) {
 
     const json = await res.json();
     const choice = json.choices?.[0];
+    const text = choice?.message?.content ?? '';
+    const finishReason = choice?.finish_reason ?? null;
+    const empty = rejectEmptyGenerateText(text, { providerId: 'groq', finishReason });
+    if (empty) return empty;
     return {
       ok: true,
-      text: choice?.message?.content ?? '',
-      finishReason: choice?.finish_reason ?? null,
+      text,
+      finishReason,
       usage: mapUsage(json.usage),
       cost: null,
     };

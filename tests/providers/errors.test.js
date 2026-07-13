@@ -1,6 +1,11 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const { formatHttpError, extractMessage } = require('../../providers/errors');
+const {
+  formatHttpError,
+  extractMessage,
+  emptyGenerateTextError,
+  rejectEmptyGenerateText,
+} = require('../../providers/errors');
 
 describe('providers/errors', () => {
   describe('extractMessage', () => {
@@ -56,6 +61,28 @@ describe('providers/errors', () => {
       const body = JSON.stringify({ error: { message: 'Model not found' } });
       const msg = formatHttpError(404, body);
       assert.equal(msg, 'HTTP 404: Model not found');
+    });
+  });
+
+  describe('rejectEmptyGenerateText', () => {
+    it('returns null when text has content', () => {
+      assert.equal(rejectEmptyGenerateText('hola'), null);
+      assert.equal(rejectEmptyGenerateText('  ok  '), null);
+    });
+
+    it('rejects empty or whitespace-only text', () => {
+      assert.deepEqual(rejectEmptyGenerateText('', { providerId: 'openai' }), {
+        ok: false,
+        error: 'openai no devolvió texto en la respuesta.',
+      });
+      assert.deepEqual(rejectEmptyGenerateText('   ', { providerId: 'groq', finishReason: 'length' }), {
+        ok: false,
+        error: 'groq no devolvió texto (finishReason: length).',
+      });
+    });
+
+    it('emptyGenerateTextError falls back without provider id', () => {
+      assert.equal(emptyGenerateTextError(), 'El proveedor no devolvió texto en la respuesta.');
     });
   });
 });

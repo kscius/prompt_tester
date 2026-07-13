@@ -71,3 +71,61 @@ describe('providers/minimax listModels', () => {
     );
   });
 });
+
+describe('providers/minimax generate', () => {
+  let originalFetch;
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  function mockOkJson(body) {
+    return {
+      ok: true,
+      status: 200,
+      json: async () => body,
+    };
+  }
+
+  it('returns ok:false when choices and reply are empty', async () => {
+    globalThis.fetch = async () =>
+      mockOkJson({
+        base_resp: { status_code: 0 },
+        choices: [{ message: { content: '' }, finish_reason: 'stop' }],
+      });
+
+    const result = await minimax.generate(ctx, {
+      model: 'abab6.5s-chat',
+      prompt: '',
+      data: 'hi',
+      temperature: 1,
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(result.error, 'minimax no devolvió texto (finishReason: stop).');
+  });
+
+  it('returns ok:true with text on success', async () => {
+    globalThis.fetch = async () =>
+      mockOkJson({
+        base_resp: { status_code: 0 },
+        choices: [{ message: { content: 'hola' }, finish_reason: 'stop' }],
+        usage: { prompt_tokens: 1, completion_tokens: 2, total_tokens: 3 },
+      });
+
+    const result = await minimax.generate(ctx, {
+      model: 'abab6.5s-chat',
+      prompt: '',
+      data: 'hi',
+      temperature: 1,
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.text, 'hola');
+    assert.equal(result.finishReason, 'stop');
+  });
+});
