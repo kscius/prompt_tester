@@ -7,6 +7,7 @@ const {
   setProviderSettings,
   getProviderSettings,
   maskApiKey,
+  getProviderConfigHealth,
 } = require('./providers/config');
 const {
   listProviderMeta,
@@ -162,7 +163,13 @@ ipcMain.handle('providers:status', () => {
     const provider = getProvider(meta.id);
     if (provider) providers[meta.id] = buildProviderStatusEntry(provider);
   }
-  return { activeProvider: getActiveProviderId(), providers };
+  const configHealth = getProviderConfigHealth();
+  return {
+    activeProvider: getActiveProviderId(),
+    providers,
+    configCorrupt: Boolean(configHealth.corrupt),
+    configError: configHealth.corrupt ? configHealth.error : undefined,
+  };
 });
 
 ipcMain.handle('providers:set-active', (_, providerId) => {
