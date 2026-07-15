@@ -34,7 +34,8 @@ function readProviderConfig() {
     providerConfigReadFailed = true;
     console.error('[config] No se pudo leer provider-config.json:', e.message);
   }
-  return { ...DEFAULT_CONFIG };
+  // Deep-copy providers so callers never mutate the shared DEFAULT_CONFIG.
+  return { ...DEFAULT_CONFIG, providers: { ...DEFAULT_CONFIG.providers } };
 }
 
 function getProviderConfigHealth() {
@@ -70,6 +71,14 @@ function setProviderSettings(providerId, settings) {
   return config.providers[providerId];
 }
 
+/** Replace (do not merge) provider settings — used by clear flows. */
+function clearProviderSettings(providerId) {
+  const config = readProviderConfig();
+  delete config.providers[providerId];
+  writeProviderConfig(config);
+  return {};
+}
+
 function getActiveProviderId() {
   return readProviderConfig().activeProvider ?? 'gemini';
 }
@@ -94,6 +103,7 @@ module.exports = {
   getProviderConfigHealth,
   getProviderSettings,
   setProviderSettings,
+  clearProviderSettings,
   getActiveProviderId,
   setActiveProviderId,
   maskApiKey,

@@ -72,6 +72,49 @@ describe('providers/config', () => {
     });
   });
 
+  describe('clearProviderSettings', () => {
+    it('removes apiKey and other settings instead of merging empty object', () => {
+      config.setProviderSettings('minimax', {
+        apiKey: 'mm-test-key-12345678',
+        groupId: 'grp-old',
+      });
+      assert.equal(config.getProviderSettings('minimax').apiKey, 'mm-test-key-12345678');
+      assert.equal(config.getProviderSettings('minimax').groupId, 'grp-old');
+
+      // Regression: setProviderSettings(id, {}) used to be a no-op merge.
+      config.setProviderSettings('minimax', {});
+      assert.equal(config.getProviderSettings('minimax').apiKey, 'mm-test-key-12345678');
+      assert.equal(config.getProviderSettings('minimax').groupId, 'grp-old');
+
+      config.clearProviderSettings('minimax');
+      assert.deepEqual(config.getProviderSettings('minimax'), {});
+      assert.equal(config.getProviderSettings('minimax').apiKey, undefined);
+      assert.equal(config.getProviderSettings('minimax').groupId, undefined);
+    });
+
+    it('clears even after first save when config file did not exist yet', () => {
+      // Ensures DEFAULT_CONFIG.providers is not mutated via shallow copy.
+      config.setProviderSettings('openai', { apiKey: 'sk-first-save-12345678' });
+      config.clearProviderSettings('openai');
+      assert.deepEqual(config.getProviderSettings('openai'), {});
+
+      config.setProviderSettings('groq', { apiKey: 'gk-other-key-12345678' });
+      assert.equal(config.getProviderSettings('groq').apiKey, 'gk-other-key-12345678');
+      assert.deepEqual(config.getProviderSettings('openai'), {});
+    });
+
+    it('blocks clear when provider-config.json is corrupt', () => {
+      config.setProviderSettings('groq', { apiKey: 'gk-test-key-12345' });
+      const configPath = config.getProviderConfigPath();
+      fs.writeFileSync(configPath, '{ not valid json', 'utf-8');
+
+      config.readProviderConfig();
+      assert.equal(config.isProviderConfigReadFailed(), true);
+
+      assert.throws(
+        () => config.clearProviderSettings('groq'),
+        (err) => err.code === 'CONFIG_READ_FAILED',
+      );
   describe('getProviderConfigHealth', () => {
     it('reports ok when config is missing or valid', () => {
       assert.deepEqual(config.getProviderConfigHealth(), { ok: true });
