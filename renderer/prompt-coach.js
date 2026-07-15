@@ -247,6 +247,11 @@ ${userLine}`;
         }));
 
     const provider = p.getActiveProviderId?.() ?? p.providerSelect?.value ?? status.activeProvider ?? 'gemini';
+    if (status.configCorrupt) {
+      p.toast(status.configError ?? 'provider-config.json está dañado. Renómbralo o corrígelo manualmente.');
+      p.openCredsModal(provider);
+      return;
+    }
     const pinfo = status.providers?.[provider];
     if (!pinfo?.configured && !pinfo?.ok) {
       p.toast('Configura la API key del proveedor primero');
