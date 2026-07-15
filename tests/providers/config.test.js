@@ -71,4 +71,39 @@ describe('providers/config', () => {
       assert.equal(config.isProviderConfigReadFailed(), false);
     });
   });
+
+  describe('clearProviderSettings', () => {
+    it('removes apiKey and other settings instead of merging empty object', () => {
+      config.setProviderSettings('minimax', {
+        apiKey: 'mm-test-key-12345678',
+        groupId: 'grp-old',
+      });
+      assert.equal(config.getProviderSettings('minimax').apiKey, 'mm-test-key-12345678');
+      assert.equal(config.getProviderSettings('minimax').groupId, 'grp-old');
+
+      // Regression: setProviderSettings(id, {}) used to be a no-op merge.
+      config.setProviderSettings('minimax', {});
+      assert.equal(config.getProviderSettings('minimax').apiKey, 'mm-test-key-12345678');
+      assert.equal(config.getProviderSettings('minimax').groupId, 'grp-old');
+
+      config.clearProviderSettings('minimax');
+      assert.deepEqual(config.getProviderSettings('minimax'), {});
+      assert.equal(config.getProviderSettings('minimax').apiKey, undefined);
+      assert.equal(config.getProviderSettings('minimax').groupId, undefined);
+    });
+
+    it('blocks clear when provider-config.json is corrupt', () => {
+      config.setProviderSettings('groq', { apiKey: 'gk-test-key-12345' });
+      const configPath = config.getProviderConfigPath();
+      fs.writeFileSync(configPath, '{ not valid json', 'utf-8');
+
+      config.readProviderConfig();
+      assert.equal(config.isProviderConfigReadFailed(), true);
+
+      assert.throws(
+        () => config.clearProviderSettings('groq'),
+        (err) => err.code === 'CONFIG_READ_FAILED',
+      );
+    });
+  });
 });

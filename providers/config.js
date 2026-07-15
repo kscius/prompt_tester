@@ -63,6 +63,14 @@ function setProviderSettings(providerId, settings) {
   return config.providers[providerId];
 }
 
+/** Replace (do not merge) provider settings — used by clear flows. */
+function clearProviderSettings(providerId) {
+  const config = readProviderConfig();
+  delete config.providers[providerId];
+  writeProviderConfig(config);
+  return {};
+}
+
 function getActiveProviderId() {
   return readProviderConfig().activeProvider ?? 'gemini';
 }
@@ -86,6 +94,7 @@ module.exports = {
   writeProviderConfig,
   getProviderSettings,
   setProviderSettings,
+  clearProviderSettings,
   getActiveProviderId,
   setActiveProviderId,
   maskApiKey,

@@ -5,6 +5,7 @@ const {
   getActiveProviderId,
   setActiveProviderId,
   setProviderSettings,
+  clearProviderSettings,
   getProviderSettings,
   maskApiKey,
 } = require('./providers/config');
@@ -206,7 +207,7 @@ ipcMain.handle('providers:clear', (_, providerId) => {
     const provider = getProvider(providerId);
     if (!provider) return { ok: false, error: `Proveedor desconocido: ${providerId}` };
 
-    setProviderSettings(providerId, {});
+    clearProviderSettings(providerId);
 
     if (providerId === 'gemini') {
       const credPath = getDataPath('credentials.json');
@@ -294,7 +295,7 @@ function validateAndSaveCredentials(creds) {
 
 ipcMain.handle('creds:clear', () => {
   try {
-    setProviderSettings('gemini', {});
+    clearProviderSettings('gemini');
     const p = getDataPath('credentials.json');
     if (fs.existsSync(p)) fs.unlinkSync(p);
     invalidateModelsCache('gemini');
