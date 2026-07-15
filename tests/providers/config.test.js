@@ -92,6 +92,17 @@ describe('providers/config', () => {
       assert.equal(config.getProviderSettings('minimax').groupId, undefined);
     });
 
+    it('clears even after first save when config file did not exist yet', () => {
+      // Ensures DEFAULT_CONFIG.providers is not mutated via shallow copy.
+      config.setProviderSettings('openai', { apiKey: 'sk-first-save-12345678' });
+      config.clearProviderSettings('openai');
+      assert.deepEqual(config.getProviderSettings('openai'), {});
+
+      config.setProviderSettings('groq', { apiKey: 'gk-other-key-12345678' });
+      assert.equal(config.getProviderSettings('groq').apiKey, 'gk-other-key-12345678');
+      assert.deepEqual(config.getProviderSettings('openai'), {});
+    });
+
     it('blocks clear when provider-config.json is corrupt', () => {
       config.setProviderSettings('groq', { apiKey: 'gk-test-key-12345' });
       const configPath = config.getProviderConfigPath();

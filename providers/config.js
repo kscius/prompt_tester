@@ -31,7 +31,8 @@ function readProviderConfig() {
     providerConfigReadFailed = true;
     console.error('[config] No se pudo leer provider-config.json:', e.message);
   }
-  return { ...DEFAULT_CONFIG };
+  // Deep-copy providers so callers never mutate the shared DEFAULT_CONFIG.
+  return { ...DEFAULT_CONFIG, providers: { ...DEFAULT_CONFIG.providers } };
 }
 
 function writeProviderConfig(config) {
