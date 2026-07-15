@@ -4,6 +4,9 @@ const fs = require('fs');
 
 const CONFIG_FILENAME = 'provider-config.json';
 
+const CONFIG_CORRUPT_ERROR =
+  'provider-config.json está dañado. Renómbralo o corrígelo manualmente.';
+
 const DEFAULT_CONFIG = {
   activeProvider: 'gemini',
   providers: {},
@@ -35,11 +38,15 @@ function readProviderConfig() {
   return { ...DEFAULT_CONFIG, providers: { ...DEFAULT_CONFIG.providers } };
 }
 
+function getProviderConfigHealth() {
+  readProviderConfig();
+  if (!providerConfigReadFailed) return { ok: true };
+  return { ok: false, corrupt: true, error: CONFIG_CORRUPT_ERROR };
+}
+
 function writeProviderConfig(config) {
   if (providerConfigReadFailed) {
-    const err = new Error(
-      'No se puede guardar: provider-config.json está dañado. Renómbralo o corrígelo manualmente.',
-    );
+    const err = new Error(`No se puede guardar: ${CONFIG_CORRUPT_ERROR}`);
     err.code = 'CONFIG_READ_FAILED';
     throw err;
   }
@@ -93,6 +100,7 @@ module.exports = {
   getProviderConfigPath,
   readProviderConfig,
   writeProviderConfig,
+  getProviderConfigHealth,
   getProviderSettings,
   setProviderSettings,
   clearProviderSettings,
@@ -100,4 +108,5 @@ module.exports = {
   setActiveProviderId,
   maskApiKey,
   isProviderConfigReadFailed: () => providerConfigReadFailed,
+  CONFIG_CORRUPT_ERROR,
 };

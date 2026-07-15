@@ -9,6 +9,7 @@ El formato sigue una idea cercana a [Keep a Changelog](https://keepachangelog.co
 - Limpiar proveedor / credenciales: `providers:clear` y `creds:clear` ahora eliminan de verdad API keys y ajustes guardados (`clearProviderSettings`), en lugar de fusionar `{}` y dejar la clave intacta. También se evita mutar el `DEFAULT_CONFIG` compartido al leer config ausente.
 - Gemini: respuestas bloqueadas o sin texto (`promptFeedback.blockReason`, candidatos vacíos, `finishReason` SAFETY/RECITATION) ya no se tratan como éxito silencioso.
 - OpenAI, Groq, DeepSeek, Mistral, Anthropic y MiniMax: respuestas HTTP 200 sin texto útil (`choices`/`content` vacíos) ya no se marcan como éxito silencioso.
+- `provider-config.json` dañado: el estado de proveedores expone `configCorrupt` y la UI muestra toast, etiqueta en cabecera y avisos en el modal (antes solo se bloqueaba la escritura).
 
 ### Añadido
 

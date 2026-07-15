@@ -63,6 +63,7 @@ let sessionCostUSD     = 0;
 let responseHistory    = [];
 let providersStatus    = { activeProvider: 'gemini', providers: {} };
 let credentialsCorruptNotified = false;
+let configCorruptNotified = false;
 let modalProviderId    = 'gemini';
 let geminiAuthMode     = 'api-key';
 
@@ -278,6 +279,10 @@ async function loadModels() {
 async function refreshCredsStatus() {
   try {
     providersStatus = await getProvidersOverview();
+    if (providersStatus.configCorrupt && !configCorruptNotified) {
+      toast(providersStatus.configError ?? 'provider-config.json está dañado. Renómbralo o corrígelo manualmente.');
+      configCorruptNotified = true;
+    }
     const geminiInfo = providersStatus.providers?.gemini;
     if (geminiInfo?.credentialsCorrupt && !credentialsCorruptNotified) {
       toast(geminiInfo.error ?? 'credentials.json está dañado. Reimporta el Service Account.');
@@ -296,7 +301,10 @@ function applyProviderStatusUI(status) {
   const info = status.providers?.[active] ?? {};
   const def = getProviderDef(active);
 
-  if (info.credentialsCorrupt) {
+  if (status.configCorrupt) {
+    credsDot.className = 'dot dot-error';
+    credsLabel.textContent = 'provider-config.json dañado';
+  } else if (info.credentialsCorrupt) {
     credsDot.className = 'dot dot-error';
     credsLabel.textContent = `${def.name} · credentials.json dañado`;
   } else if (isProviderConfigured(info)) {
@@ -311,7 +319,12 @@ function applyProviderStatusUI(status) {
     const pid = tab.dataset.provider;
     const pInfo = status.providers?.[pid];
     const dot = tab.querySelector('.provider-tab-dot');
-    if (dot) dot.classList.toggle('configured', isProviderConfigured(pInfo) && !pInfo?.credentialsCorrupt);
+    if (dot) {
+      dot.classList.toggle(
+        'configured',
+        !status.configCorrupt && isProviderConfigured(pInfo) && !pInfo?.credentialsCorrupt,
+      );
+    }
   });
 }
 
@@ -440,7 +453,10 @@ function updateProviderPanels(status) {
     const banner = document.getElementById(`status-${p.id}`);
     if (!banner) continue;
 
-    if (info.credentialsCorrupt) {
+    if (status.configCorrupt) {
+      banner.className = 'provider-status-banner unconfigured';
+      banner.innerHTML = `<span class="dot dot-error"></span><span>${esc(status.configError ?? 'provider-config.json dañado')}</span>`;
+    } else if (info.credentialsCorrupt) {
       banner.className = 'provider-status-banner unconfigured';
       banner.innerHTML = `<span class="dot dot-error"></span><span>${esc(info.error ?? 'credentials.json dañado')}</span>`;
     } else if (isProviderConfigured(info)) {
@@ -826,6 +842,12 @@ async function sendRequest() {
   if (!model) { toast('Selecciona un modelo primero'); return; }
 
   const status = await getProvidersOverview();
+  providersStatus = status;
+  if (status.configCorrupt) {
+    toast(status.configError ?? 'provider-config.json está dañado. Renómbralo o corrígelo manualmente.');
+    openCredsModal(provider);
+    return;
+  }
   const pinfo = status.providers?.[provider];
   if (pinfo?.credentialsCorrupt) {
     toast(pinfo.error ?? 'credentials.json está dañado. Reimporta el Service Account.');

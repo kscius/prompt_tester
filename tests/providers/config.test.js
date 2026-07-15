@@ -115,6 +115,22 @@ describe('providers/config', () => {
         () => config.clearProviderSettings('groq'),
         (err) => err.code === 'CONFIG_READ_FAILED',
       );
+  describe('getProviderConfigHealth', () => {
+    it('reports ok when config is missing or valid', () => {
+      assert.deepEqual(config.getProviderConfigHealth(), { ok: true });
+      config.setProviderSettings('groq', { apiKey: 'gk-test-key-12345' });
+      assert.deepEqual(config.getProviderConfigHealth(), { ok: true });
+    });
+
+    it('reports corrupt with a stable error message when JSON is invalid', () => {
+      const configPath = config.getProviderConfigPath();
+      fs.writeFileSync(configPath, '{ not valid json', 'utf-8');
+
+      const health = config.getProviderConfigHealth();
+      assert.equal(health.ok, false);
+      assert.equal(health.corrupt, true);
+      assert.equal(health.error, config.CONFIG_CORRUPT_ERROR);
+      assert.match(health.error, /provider-config\.json/);
     });
   });
 });
