@@ -1,4 +1,4 @@
-const { formatHttpError, rejectEmptyGenerateText } = require('./errors');
+const { formatHttpError, rejectEmptyGenerateText, extractChatCompletionText } = require('./errors');
 
 const BASE_URL = 'https://api.minimax.chat/v1';
 
@@ -103,7 +103,8 @@ async function generate(ctx, { model, prompt, data, temperature }) {
     }
 
     const choice = json.choices?.[0];
-    const text = choice?.message?.content ?? choice?.text ?? json.reply ?? '';
+    const rawContent = choice?.message?.content ?? choice?.text ?? json.reply ?? '';
+    const text = extractChatCompletionText(rawContent);
     const finishReason = choice?.finish_reason ?? json.finish_reason ?? null;
     const empty = rejectEmptyGenerateText(text, { providerId: 'minimax', finishReason });
     if (empty) return empty;

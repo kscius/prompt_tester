@@ -88,5 +88,55 @@ for (const { id, mod } of providers) {
         totalTokenCount: 2,
       });
     });
+
+    it('joins array message.content instead of returning [object Object]', async () => {
+      globalThis.fetch = async () =>
+        mockOkJson({
+          choices: [
+            {
+              message: {
+                content: [
+                  { type: 'text', text: 'parte-a' },
+                  { type: 'text', text: ' parte-b' },
+                ],
+              },
+              finish_reason: 'stop',
+            },
+          ],
+        });
+
+      const result = await mod.generate(ctx, {
+        model: 'test-model',
+        prompt: '',
+        data: 'hi',
+        temperature: 1,
+      });
+
+      assert.equal(result.ok, true);
+      assert.equal(result.text, 'parte-a parte-b');
+      assert.notEqual(result.text, '[object Object]');
+    });
+
+    it('returns ok:false when content array has no usable text parts', async () => {
+      globalThis.fetch = async () =>
+        mockOkJson({
+          choices: [
+            {
+              message: { content: [{ type: 'image_url', image_url: { url: 'x' } }] },
+              finish_reason: 'stop',
+            },
+          ],
+        });
+
+      const result = await mod.generate(ctx, {
+        model: 'test-model',
+        prompt: '',
+        data: 'hi',
+        temperature: 1,
+      });
+
+      assert.equal(result.ok, false);
+      assert.equal(result.error, `${id} no devolvió texto (finishReason: stop).`);
+    });
   });
 }
