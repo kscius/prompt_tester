@@ -1,4 +1,4 @@
-const { formatHttpError, rejectEmptyGenerateText } = require('./errors');
+const { formatHttpError, rejectEmptyGenerateText, extractChatCompletionText } = require('./errors');
 
 const BASE_URL = 'https://api.openai.com/v1';
 
@@ -81,7 +81,7 @@ async function generate(ctx, { model, prompt, data, temperature }) {
 
     const json = await res.json();
     const choice = json.choices?.[0];
-    const text = choice?.message?.content ?? '';
+    const text = extractChatCompletionText(choice?.message?.content);
     const finishReason = choice?.finish_reason ?? null;
     const empty = rejectEmptyGenerateText(text, { providerId: 'openai', finishReason });
     if (empty) return empty;

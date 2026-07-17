@@ -5,6 +5,7 @@ const {
   extractMessage,
   emptyGenerateTextError,
   rejectEmptyGenerateText,
+  extractChatCompletionText,
 } = require('../../providers/errors');
 
 describe('providers/errors', () => {
@@ -64,6 +65,35 @@ describe('providers/errors', () => {
     });
   });
 
+  describe('extractChatCompletionText', () => {
+    it('returns strings unchanged', () => {
+      assert.equal(extractChatCompletionText('hola'), 'hola');
+      assert.equal(extractChatCompletionText(''), '');
+    });
+
+    it('joins text parts from content arrays', () => {
+      assert.equal(
+        extractChatCompletionText([
+          { type: 'text', text: 'hola ' },
+          { type: 'text', text: 'mundo' },
+        ]),
+        'hola mundo',
+      );
+    });
+
+    it('supports string parts and part.content', () => {
+      assert.equal(extractChatCompletionText(['a', { content: 'b' }]), 'ab');
+    });
+
+    it('returns empty string for null, objects, or empty arrays', () => {
+      assert.equal(extractChatCompletionText(null), '');
+      assert.equal(extractChatCompletionText(undefined), '');
+      assert.equal(extractChatCompletionText({ text: 'x' }), '');
+      assert.equal(extractChatCompletionText([]), '');
+      assert.equal(extractChatCompletionText([{ type: 'image_url', image_url: {} }]), '');
+    });
+  });
+
   describe('rejectEmptyGenerateText', () => {
     it('returns null when text has content', () => {
       assert.equal(rejectEmptyGenerateText('hola'), null);
@@ -83,6 +113,18 @@ describe('providers/errors', () => {
 
     it('emptyGenerateTextError falls back without provider id', () => {
       assert.equal(emptyGenerateTextError(), 'El proveedor no devolvió texto en la respuesta.');
+    });
+
+    it('rejects array content that stringifies to [object Object] without extraction', () => {
+      // Regression guard: String([{ text: 'x' }]) === '[object Object]' which is non-empty.
+      // Callers must extractChatCompletionText first; raw arrays still look "non-empty".
+      const raw = [{ type: 'text', text: '' }];
+      assert.equal(String(raw).trim(), '[object Object]');
+      assert.equal(rejectEmptyGenerateText(raw), null);
+      assert.deepEqual(rejectEmptyGenerateText(extractChatCompletionText(raw), { providerId: 'openai' }), {
+        ok: false,
+        error: 'openai no devolvió texto en la respuesta.',
+      });
     });
   });
 });

@@ -92,6 +92,30 @@ function emptyGenerateTextError(providerId, finishReason) {
 }
 
 /**
+ * Normalize OpenAI-compatible message.content (string or array of parts) to plain text.
+ * Without this, arrays stringify to "[object Object]" and look like a successful reply.
+ * @param {unknown} content
+ * @returns {string}
+ */
+function extractChatCompletionText(content) {
+  if (content == null) return '';
+  if (typeof content === 'string') return content;
+  if (typeof content === 'number' || typeof content === 'boolean') return String(content);
+  if (!Array.isArray(content)) return '';
+
+  return content
+    .map((part) => {
+      if (part == null) return '';
+      if (typeof part === 'string') return part;
+      if (typeof part !== 'object') return '';
+      if (typeof part.text === 'string') return part.text;
+      if (typeof part.content === 'string') return part.content;
+      return '';
+    })
+    .join('');
+}
+
+/**
  * @param {unknown} text
  * @param {{ providerId?: string, finishReason?: string|null }} [opts]
  * @returns {{ ok: false, error: string }|null}
@@ -107,4 +131,5 @@ module.exports = {
   STATUS_HINTS,
   emptyGenerateTextError,
   rejectEmptyGenerateText,
+  extractChatCompletionText,
 };
