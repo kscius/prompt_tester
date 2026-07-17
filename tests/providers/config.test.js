@@ -115,6 +115,9 @@ describe('providers/config', () => {
         () => config.clearProviderSettings('groq'),
         (err) => err.code === 'CONFIG_READ_FAILED',
       );
+    });
+  });
+
   describe('getProviderConfigHealth', () => {
     it('reports ok when config is missing or valid', () => {
       assert.deepEqual(config.getProviderConfigHealth(), { ok: true });
