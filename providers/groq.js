@@ -1,5 +1,4 @@
 const { formatHttpError, rejectEmptyGenerateText, extractChatCompletionText } = require('./errors');
-const { fetchWithTimeout, LIST_MODELS_TIMEOUT_MS, GENERATE_TIMEOUT_MS } = require('./http');
 
 const BASE_URL = 'https://api.groq.com/openai/v1';
 
@@ -23,12 +22,8 @@ async function listModels(ctx) {
   if (!apiKey) return fallbackModels;
 
   try {
-    const res = await fetchWithTimeout(`${BASE_URL}/models`, {
+    const res = await fetch(`${BASE_URL}/models`, {
       headers: { Authorization: `Bearer ${apiKey}` },
-    }, {
-      timeoutMs: LIST_MODELS_TIMEOUT_MS,
-      providerId: 'groq',
-      operation: 'listModels',
     });
     if (!res.ok) {
       const errBody = await res.text();
@@ -64,7 +59,7 @@ async function generate(ctx, { model, prompt, data, temperature }) {
   messages.push({ role: 'user', content: data || '' });
 
   try {
-    const res = await fetchWithTimeout(`${BASE_URL}/chat/completions`, {
+    const res = await fetch(`${BASE_URL}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -76,10 +71,6 @@ async function generate(ctx, { model, prompt, data, temperature }) {
         temperature: temperature ?? 1,
         max_tokens: 65535,
       }),
-    }, {
-      timeoutMs: GENERATE_TIMEOUT_MS,
-      providerId: 'groq',
-      operation: 'generate',
     });
 
     if (!res.ok) {

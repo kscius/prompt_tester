@@ -43,13 +43,19 @@ describe('providers/http', () => {
 
   describe('fetchWithTimeout', () => {
     let originalFetch;
+    let originalSetTimeout;
+    let originalClearTimeout;
 
     beforeEach(() => {
       originalFetch = globalThis.fetch;
+      originalSetTimeout = globalThis.setTimeout;
+      originalClearTimeout = globalThis.clearTimeout;
     });
 
     afterEach(() => {
       globalThis.fetch = originalFetch;
+      globalThis.setTimeout = originalSetTimeout;
+      globalThis.clearTimeout = originalClearTimeout;
     });
 
     it('passes AbortSignal to fetch and returns the response', async () => {
@@ -124,6 +130,7 @@ describe('providers/http', () => {
 
     it('openai generate maps timeout to ok:false via catch', async () => {
       const openai = require('../../providers/openai');
+      globalThis.setTimeout = (callback) => originalSetTimeout(callback, 0);
       globalThis.fetch = async (_url, options) =>
         new Promise((_resolve, reject) => {
           options.signal.addEventListener(
