@@ -1,4 +1,5 @@
 const { formatHttpError, rejectEmptyGenerateText } = require('./errors');
+const { fetchWithTimeout, LIST_MODELS_TIMEOUT_MS, GENERATE_TIMEOUT_MS } = require('./http');
 
 const BASE_URL = 'https://api.anthropic.com/v1';
 const ANTHROPIC_VERSION = '2023-06-01';
@@ -27,8 +28,12 @@ async function listModels(ctx) {
   if (!apiKey) return fallbackModels;
 
   try {
-    const res = await fetch(`${BASE_URL}/models`, {
+    const res = await fetchWithTimeout(`${BASE_URL}/models`, {
       headers: authHeaders(apiKey),
+    }, {
+      timeoutMs: LIST_MODELS_TIMEOUT_MS,
+      providerId: 'anthropic',
+      operation: 'listModels',
     });
     if (!res.ok) {
       const errBody = await res.text();
@@ -73,13 +78,17 @@ async function generate(ctx, { model, prompt, data, temperature }) {
   if (prompt?.trim()) body.system = prompt;
 
   try {
-    const res = await fetch(`${BASE_URL}/messages`, {
+    const res = await fetchWithTimeout(`${BASE_URL}/messages`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...authHeaders(apiKey),
       },
       body: JSON.stringify(body),
+    }, {
+      timeoutMs: GENERATE_TIMEOUT_MS,
+      providerId: 'anthropic',
+      operation: 'generate',
     });
 
     if (!res.ok) {

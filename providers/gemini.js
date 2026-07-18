@@ -1,4 +1,5 @@
 const { formatHttpError } = require('./errors');
+const { fetchWithTimeout, LIST_MODELS_TIMEOUT_MS, GENERATE_TIMEOUT_MS } = require('./http');
 
 const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 
@@ -94,8 +95,12 @@ async function fetchAllApiModels(auth) {
     if (pageToken) url.searchParams.set('pageToken', pageToken);
     if (auth.apiKey) url.searchParams.set('key', auth.apiKey);
 
-    const res = await fetch(url.toString(), {
+    const res = await fetchWithTimeout(url.toString(), {
       headers: buildAuthHeaders(auth),
+    }, {
+      timeoutMs: LIST_MODELS_TIMEOUT_MS,
+      providerId: 'gemini',
+      operation: 'listModels',
     });
 
     if (!res.ok) {
@@ -199,13 +204,17 @@ async function generate(ctx, { model, prompt, data, temperature }) {
   }
 
   try {
-    const res = await fetch(buildModelUrl(`/models/${model}:generateContent`, auth), {
+    const res = await fetchWithTimeout(buildModelUrl(`/models/${model}:generateContent`, auth), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...buildAuthHeaders(auth),
       },
       body: JSON.stringify(requestBody),
+    }, {
+      timeoutMs: GENERATE_TIMEOUT_MS,
+      providerId: 'gemini',
+      operation: 'generate',
     });
 
     if (!res.ok) {
