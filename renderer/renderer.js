@@ -58,6 +58,7 @@ const PROVIDERS = [
 let savedPrompts       = [];
 let savedPanelOpen     = false;
 let isSending          = false;
+let modelsLoadGen      = 0;
 let lastRawText        = '';
 let sessionCostUSD     = 0;
 let responseHistory    = [];
@@ -254,8 +255,11 @@ async function loadProviders() {
 async function loadModels() {
   const previous = modelSelect.value;
   const providerId = getActiveProviderId();
+  const gen = ++modelsLoadGen;
   try {
     const result = await fetchModels(providerId);
+    // Ignore stale responses if the user switched provider (or reloaded) mid-flight.
+    if (gen !== modelsLoadGen) return;
     const models = Array.isArray(result) ? result : (result?.models ?? []);
     if (result?.warning) {
       toast(`Lista de respaldo: ${result.warning}`);
@@ -270,6 +274,7 @@ async function loadModels() {
       modelSelect.value = previous;
     }
   } catch (e) {
+    if (gen !== modelsLoadGen) return;
     console.error('[loadModels]', e);
     modelSelect.innerHTML = '<option value="">Sin modelos disponibles</option>';
     toast('No se pudieron cargar modelos; usando lista vacía.');
@@ -841,7 +846,14 @@ async function sendRequest() {
 
   if (!model) { toast('Selecciona un modelo primero'); return; }
 
-  const status = await getProvidersOverview();
+  let status;
+  try {
+    status = await getProvidersOverview();
+  } catch (err) {
+    console.error('[sendRequest] providers:status', err);
+    toast(`No se pudo verificar la configuración: ${err?.message ?? err}`);
+    return;
+  }
   providersStatus = status;
   if (status.configCorrupt) {
     toast(status.configError ?? 'provider-config.json está dañado. Renómbralo o corrígelo manualmente.');
@@ -901,12 +913,12 @@ async function sendRequest() {
       responseHistory.push({ model, temperature, text: lastRawText, meta, ts: new Date().toISOString(), provider });
       renderHistory();
 
+      // Always refresh elapsed/finishReason; clear stale token/cost when usage is absent.
+      timeInfo.textContent   = `⏱ ${elapsed}s`;
+      finishInfo.textContent = result.finishReason ? `Fin: ${result.finishReason}` : '';
       if (result.usage) {
         const u = result.usage;
-        tokenInfo.textContent  = `Tokens  entrada: ${u.promptTokenCount ?? '—'} · salida: ${u.candidatesTokenCount ?? u.completionTokenCount ?? '—'} · total: ${u.totalTokenCount ?? '—'}`;
-        timeInfo.textContent   = `⏱ ${elapsed}s`;
-        finishInfo.textContent = result.finishReason ? `Fin: ${result.finishReason}` : '';
-
+        tokenInfo.textContent = `Tokens  entrada: ${u.promptTokenCount ?? '—'} · salida: ${u.candidatesTokenCount ?? u.completionTokenCount ?? '—'} · total: ${u.totalTokenCount ?? '—'}`;
         if (result.cost != null) {
           sessionCostUSD += result.cost;
           costInfo.textContent      = `💰 ${fmtCost(result.cost)}`;
@@ -915,9 +927,11 @@ async function sendRequest() {
         } else {
           costInfo.textContent = '';
         }
-
-        outputMeta.classList.remove('hidden');
+      } else {
+        tokenInfo.textContent = '';
+        costInfo.textContent = '';
       }
+      outputMeta.classList.remove('hidden');
 
       outputArea.lastElementChild?.scrollIntoView({ behavior: 'smooth', block: 'end' });
     } else {
