@@ -94,6 +94,7 @@ function buildProviderCtx(providerId) {
     settings: getProviderSettings(providerId),
     getDataPath,
     readJSON,
+    fileExists: fs.existsSync,
   };
 }
 
@@ -320,7 +321,7 @@ ipcMain.handle('models:list', (_, providerId) => {
   const id = providerId || getActiveProviderId();
   const provider = getProvider(id);
   if (!provider) return { models: [], warning: null };
-  return listModelsForProvider(id, getDataPath, readJSON);
+  return listModelsForProvider(id, getDataPath, readJSON, fs.existsSync);
 });
 
 // ---------------------------------------------------------------------------
@@ -329,12 +330,12 @@ ipcMain.handle('models:list', (_, providerId) => {
 
 ipcMain.handle('llm:call', async (_, { provider, model, prompt, data, temperature }) => {
   const providerId = provider || getActiveProviderId();
-  const result = await callProvider(providerId, { model, prompt, data, temperature }, getDataPath, readJSON);
+  const result = await callProvider(providerId, { model, prompt, data, temperature }, getDataPath, readJSON, fs.existsSync);
   return enrichResultWithCost(providerId, model, result);
 });
 
 ipcMain.handle('gemini:call', async (_, args) => {
-  const result = await callProvider('gemini', args, getDataPath, readJSON);
+  const result = await callProvider('gemini', args, getDataPath, readJSON, fs.existsSync);
   return enrichResultWithCost('gemini', args.model, result);
 });
 

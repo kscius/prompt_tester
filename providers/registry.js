@@ -23,11 +23,12 @@ const providerById = Object.fromEntries(PROVIDERS.map((p) => [p.id, p]));
 /** @type {Map<string, { cacheKey: string, models: Array<{ id: string, label: string }> }>} */
 const modelsCache = new Map();
 
-function buildProviderCtx(providerId, getDataPath, readJSON) {
+function buildProviderCtx(providerId, getDataPath, readJSON, fileExists) {
   return {
     settings: getProviderSettings(providerId),
     getDataPath,
     readJSON,
+    fileExists,
   };
 }
 
@@ -62,11 +63,21 @@ function invalidateModelsCache(providerId) {
   modelsCache.clear();
 }
 
-async function listModelsForProvider(providerId, getDataPath, readJSON) {
+async function listModelsForProvider(providerId, getDataPath, readJSON, fileExists) {
   const provider = getProvider(providerId);
   if (!provider) return { models: [], warning: null };
 
-  const ctx = buildProviderCtx(providerId, getDataPath, readJSON);
+  const ctx = buildProviderCtx(providerId, getDataPath, readJSON, fileExists);
+
+  if (typeof provider.getConfigurationError === 'function') {
+    const configError = provider.getConfigurationError(ctx);
+    if (configError) {
+      return {
+        models: provider.fallbackModels ?? [],
+        warning: configError,
+      };
+    }
+  }
 
   if (!provider.isConfigured(ctx)) {
     return {
@@ -95,13 +106,19 @@ async function listModelsForProvider(providerId, getDataPath, readJSON) {
   }
 }
 
-async function callProvider(providerId, args, getDataPath, readJSON) {
+async function callProvider(providerId, args, getDataPath, readJSON, fileExists) {
   const provider = getProvider(providerId);
   if (!provider) {
     return { ok: false, error: `Proveedor desconocido: ${providerId}` };
   }
 
-  const ctx = buildProviderCtx(providerId, getDataPath, readJSON);
+  const ctx = buildProviderCtx(providerId, getDataPath, readJSON, fileExists);
+  if (typeof provider.getConfigurationError === 'function') {
+    const configError = provider.getConfigurationError(ctx);
+    if (configError) {
+      return { ok: false, error: configError };
+    }
+  }
   if (!provider.isConfigured(ctx)) {
     return { ok: false, error: 'Proveedor no configurado.' };
   }

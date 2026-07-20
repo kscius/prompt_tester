@@ -1,6 +1,7 @@
 const { describe, it, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const gemini = require('../../providers/gemini');
+const { CORRUPT_ERROR } = require('../../providers/credentials-store');
 
 const ctx = {
   settings: { apiKey: 'AIza-test-key', authMode: 'apiKey' },
@@ -108,5 +109,50 @@ describe('providers/gemini generate', () => {
       candidatesTokenCount: 1,
       totalTokenCount: 3,
     });
+  });
+});
+
+describe('providers/gemini service-account credentials', () => {
+  const saCtxBase = {
+    settings: { authMode: 'serviceAccount' },
+    getDataPath: (f) => `/data/${f}`,
+  };
+
+  it('treats missing credentials as unconfigured without configuration error', () => {
+    const ctxMissing = {
+      ...saCtxBase,
+      readJSON: () => null,
+      fileExists: () => false,
+    };
+
+    assert.equal(gemini.isConfigured(ctxMissing), false);
+    assert.equal(gemini.getConfigurationError(ctxMissing), null);
+  });
+
+  it('surfaces CORRUPT_ERROR when credentials.json exists but is unreadable', () => {
+    const ctxCorrupt = {
+      ...saCtxBase,
+      readJSON: () => null,
+      fileExists: () => true,
+    };
+
+    assert.equal(gemini.isConfigured(ctxCorrupt), false);
+    assert.equal(gemini.getConfigurationError(ctxCorrupt), CORRUPT_ERROR);
+  });
+
+  it('is configured for a valid service-account JSON', () => {
+    const ctxValid = {
+      ...saCtxBase,
+      readJSON: () => ({
+        type: 'service_account',
+        client_email: 'bot@example.com',
+        private_key: 'key',
+        project_id: 'demo',
+      }),
+      fileExists: () => true,
+    };
+
+    assert.equal(gemini.isConfigured(ctxValid), true);
+    assert.equal(gemini.getConfigurationError(ctxValid), null);
   });
 });
