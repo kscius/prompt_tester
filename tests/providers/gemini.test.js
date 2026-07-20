@@ -155,4 +155,19 @@ describe('providers/gemini service-account credentials', () => {
     assert.equal(gemini.isConfigured(ctxValid), true);
     assert.equal(gemini.getConfigurationError(ctxValid), null);
   });
+
+  it('remains configured for valid SA when fileExists is omitted (legacy ctx)', () => {
+    const ctxLegacy = {
+      ...saCtxBase,
+      readJSON: () => ({
+        type: 'service_account',
+        client_email: 'bot@example.com',
+        private_key: 'key',
+        project_id: 'demo',
+      }),
+    };
+
+    assert.equal(gemini.isConfigured(ctxLegacy), true);
+    assert.equal(gemini.getConfigurationError(ctxLegacy), null);
+  });
 });

@@ -27,7 +27,18 @@ function credentialsFileExists(ctx, filePath) {
 
 function inspectServiceAccountCredentials(ctx) {
   const filePath = ctx.getDataPath('credentials.json');
-  return inspectCredentialsFile(ctx.readJSON, filePath, (p) => credentialsFileExists(ctx, p));
+  if (typeof ctx.fileExists === 'function') {
+    return inspectCredentialsFile(ctx.readJSON, filePath, (p) => credentialsFileExists(ctx, p));
+  }
+  // Legacy ctx without fileExists cannot distinguish missing vs unreadable files.
+  const raw = ctx.readJSON(filePath);
+  if (raw === null) {
+    return { ok: true, creds: null, corrupt: false };
+  }
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return { ok: false, creds: null, corrupt: true, error: CORRUPT_ERROR };
+  }
+  return { ok: true, creds: raw, corrupt: false };
 }
 
 /** Prefer this over a generic "not configured" when credentials.json is unreadable. */
