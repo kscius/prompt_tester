@@ -92,6 +92,33 @@ describe('providers/config', () => {
       assert.equal(config.getProviderSettings('minimax').groupId, undefined);
     });
 
+    it('clears MiniMax groupId when set to null without wiping apiKey', () => {
+      config.setProviderSettings('minimax', {
+        apiKey: 'mm-test-key-12345678',
+        groupId: 'grp-stale',
+      });
+
+      config.setProviderSettings('minimax', {
+        apiKey: 'mm-test-key-12345678',
+        groupId: null,
+      });
+
+      const settings = config.getProviderSettings('minimax');
+      assert.equal(settings.apiKey, 'mm-test-key-12345678');
+      assert.equal(settings.groupId, undefined);
+      assert.equal(Object.prototype.hasOwnProperty.call(settings, 'groupId'), false);
+    });
+
+    it('updates MiniMax groupId when a new non-empty value is provided', () => {
+      config.setProviderSettings('minimax', {
+        apiKey: 'mm-test-key-12345678',
+        groupId: 'grp-old',
+      });
+      config.setProviderSettings('minimax', { groupId: 'grp-new' });
+      assert.equal(config.getProviderSettings('minimax').groupId, 'grp-new');
+      assert.equal(config.getProviderSettings('minimax').apiKey, 'mm-test-key-12345678');
+    });
+
     it('clears even after first save when config file did not exist yet', () => {
       // Ensures DEFAULT_CONFIG.providers is not mutated via shallow copy.
       config.setProviderSettings('openai', { apiKey: 'sk-first-save-12345678' });

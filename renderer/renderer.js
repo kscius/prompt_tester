@@ -486,6 +486,14 @@ function updateProviderPanels(status) {
           <span>Cuenta: <strong>${esc(info.clientEmail ?? '')}</strong></span>`;
       }
     }
+
+    // Prefill optional Group ID so users can see and clear a stored value.
+    if (p.hasGroupId) {
+      const groupInput = document.getElementById(`key-${p.id}-group`);
+      if (groupInput && document.activeElement !== groupInput) {
+        groupInput.value = info.groupId ?? '';
+      }
+    }
   }
 }
 
@@ -526,8 +534,8 @@ async function saveProviderKey(providerId) {
 
   const payload = { providerId, apiKey };
   if (providerId === 'minimax') {
-    const groupId = document.getElementById('key-minimax-group')?.value.trim();
-    if (groupId) payload.groupId = groupId;
+    // Always send groupId (including '') so main can clear a stored Group-Id.
+    payload.groupId = document.getElementById('key-minimax-group')?.value.trim() ?? '';
   }
 
   try {

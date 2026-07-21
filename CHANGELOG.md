@@ -6,6 +6,7 @@ El formato sigue una idea cercana a [Keep a Changelog](https://keepachangelog.co
 
 ### Corregido
 
+- MiniMax: guardar con Group ID vacío ahora elimina el `groupId` persistido (antes el merge de config lo dejaba intacto y seguía enviándose como `Group-Id`).
 - Limpiar proveedor / credenciales: `providers:clear` y `creds:clear` ahora eliminan de verdad API keys y ajustes guardados (`clearProviderSettings`), en lugar de fusionar `{}` y dejar la clave intacta. También se evita mutar el `DEFAULT_CONFIG` compartido al leer config ausente.
 - Gemini: respuestas bloqueadas o sin texto (`promptFeedback.blockReason`, candidatos vacíos, `finishReason` SAFETY/RECITATION) ya no se tratan como éxito silencioso.
 - OpenAI, Groq, DeepSeek, Mistral, Anthropic y MiniMax: respuestas HTTP 200 sin texto útil (`choices`/`content` vacíos) ya no se marcan como éxito silencioso.
