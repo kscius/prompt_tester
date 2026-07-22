@@ -1,5 +1,6 @@
 const { formatHttpError } = require('./errors');
 const { fetchWithTimeout, LIST_MODELS_TIMEOUT_MS, GENERATE_TIMEOUT_MS } = require('./http');
+const { inspectCredentialsFile, CORRUPT_ERROR } = require('./credentials-store');
 
 const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 
@@ -19,15 +20,49 @@ function usesApiKey(ctx) {
   return Boolean(ctx.settings?.apiKey?.trim());
 }
 
+function credentialsFileExists(ctx, filePath) {
+  if (typeof ctx.fileExists === 'function') return Boolean(ctx.fileExists(filePath));
+  return false;
+}
+
+function inspectServiceAccountCredentials(ctx) {
+  const filePath = ctx.getDataPath('credentials.json');
+  if (typeof ctx.fileExists === 'function') {
+    return inspectCredentialsFile(ctx.readJSON, filePath, (p) => credentialsFileExists(ctx, p));
+  }
+  // Legacy ctx without fileExists cannot distinguish missing vs unreadable files.
+  const raw = ctx.readJSON(filePath);
+  if (raw === null) {
+    return { ok: true, creds: null, corrupt: false };
+  }
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return { ok: false, creds: null, corrupt: true, error: CORRUPT_ERROR };
+  }
+  return { ok: true, creds: raw, corrupt: false };
+}
+
+/** Prefer this over a generic "not configured" when credentials.json is unreadable. */
+function getConfigurationError(ctx) {
+  if (usesApiKey(ctx)) return null;
+  const inspection = inspectServiceAccountCredentials(ctx);
+  if (inspection.corrupt) return inspection.error ?? CORRUPT_ERROR;
+  return null;
+}
+
 function isConfigured(ctx) {
   if (usesApiKey(ctx)) return Boolean(ctx.settings?.apiKey?.trim());
-  const creds = ctx.readJSON(ctx.getDataPath('credentials.json'));
-  return Boolean(creds?.type === 'service_account');
+  const inspection = inspectServiceAccountCredentials(ctx);
+  if (inspection.corrupt) return false;
+  return Boolean(inspection.creds?.type === 'service_account');
 }
 
 async function getServiceAccountAccessToken(ctx) {
   try {
-    const creds = ctx.readJSON(ctx.getDataPath('credentials.json'));
+    const inspection = inspectServiceAccountCredentials(ctx);
+    if (inspection.corrupt) {
+      return { ok: false, error: inspection.error ?? CORRUPT_ERROR };
+    }
+    const creds = inspection.creds;
     if (!creds) {
       return { ok: false, error: 'Sin credenciales configuradas. Configúralas en el botón de credenciales.' };
     }
@@ -252,7 +287,8 @@ function getModelsCacheKey(ctx) {
     const apiKey = ctx.settings?.apiKey?.trim() ?? '';
     return `apiKey:${apiKey.slice(0, 8)}`;
   }
-  const creds = ctx.readJSON(ctx.getDataPath('credentials.json'));
+  const inspection = inspectServiceAccountCredentials(ctx);
+  const creds = inspection.creds;
   return creds?.client_email ?? creds?.project_id ?? 'default';
 }
 
@@ -262,6 +298,7 @@ module.exports = {
   authType: 'dual',
   fallbackModels,
   isConfigured,
+  getConfigurationError,
   listModels,
   generate,
   getModelsCacheKey,
