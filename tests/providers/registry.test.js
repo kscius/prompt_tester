@@ -66,6 +66,20 @@ describe('providers/registry', () => {
     assert.match(result.warning, /credenciales/i);
   });
 
+  it('surfaces corrupt gemini credentials instead of generic unconfigured warning', async () => {
+    invalidateModelsCache('gemini');
+    const { CORRUPT_ERROR } = require('../../providers/credentials-store');
+    const result = await listModelsForProvider(
+      'gemini',
+      (f) => `/data/${f}`,
+      () => null,
+      () => true,
+    );
+    assert.deepEqual(result.models, gemini.fallbackModels);
+    assert.equal(result.warning, CORRUPT_ERROR);
+    assert.doesNotMatch(result.warning, /no está configurado/i);
+  });
+
   it('caches listModels result for the same provider', async () => {
     groq.isConfigured = () => true;
     let calls = 0;
@@ -124,6 +138,19 @@ describe('providers/registry callProvider', () => {
     const result = await callProvider('groq', { model: 'llama', prompt: 'hi' }, noopIO.getDataPath, noopIO.readJSON);
     assert.equal(result.ok, false);
     assert.equal(result.error, 'Proveedor no configurado.');
+  });
+
+  it('returns corrupt credentials error for gemini instead of generic unconfigured', async () => {
+    const { CORRUPT_ERROR } = require('../../providers/credentials-store');
+    const result = await callProvider(
+      'gemini',
+      { model: 'gemini-2.5-flash', prompt: 'hi' },
+      (f) => `/data/${f}`,
+      () => null,
+      () => true,
+    );
+    assert.equal(result.ok, false);
+    assert.equal(result.error, CORRUPT_ERROR);
   });
 
   it('delegates to provider.generate when configured', async () => {
