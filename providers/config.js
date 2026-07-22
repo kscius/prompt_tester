@@ -66,7 +66,16 @@ function getProviderSettings(providerId) {
 
 function setProviderSettings(providerId, settings) {
   const config = readProviderConfig();
-  config.providers[providerId] = { ...(config.providers[providerId] ?? {}), ...settings };
+  const next = { ...(config.providers[providerId] ?? {}) };
+  for (const [key, value] of Object.entries(settings ?? {})) {
+    // null/undefined removes a field (e.g. clearing MiniMax groupId).
+    if (value === null || value === undefined) {
+      delete next[key];
+    } else {
+      next[key] = value;
+    }
+  }
+  config.providers[providerId] = next;
   writeProviderConfig(config);
   return config.providers[providerId];
 }

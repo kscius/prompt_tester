@@ -195,7 +195,14 @@ ipcMain.handle('providers:save-key', (_, { providerId, apiKey, groupId }) => {
     if (!trimmed) return { ok: false, error: 'API key vacía' };
 
     const settings = { apiKey: trimmed };
-    if (groupId?.trim()) settings.groupId = groupId.trim();
+    // MiniMax: always apply groupId from the payload so an empty field clears
+    // a previously saved Group-Id (setProviderSettings treats null as delete).
+    if (providerId === 'minimax' && groupId !== undefined) {
+      const trimmedGroup = String(groupId ?? '').trim();
+      settings.groupId = trimmedGroup || null;
+    } else if (groupId?.trim()) {
+      settings.groupId = groupId.trim();
+    }
     if (providerId === 'gemini') {
       settings.authMode = 'apiKey';
       const credPath = getDataPath('credentials.json');
