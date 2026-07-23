@@ -15,6 +15,32 @@ function isChatModel(id) {
   return /^(gpt-|chatgpt-|o[1349]|text-davinci)/i.test(id) || /\bgpt-/i.test(id);
 }
 
+/** o1 / o3 / o4… — no admiten temperature ni max_tokens clásicos. */
+function isReasoningModel(modelId) {
+  const id = String(modelId ?? '').trim().toLowerCase();
+  return /^o[1-9]($|[-.])/.test(id);
+}
+
+function buildChatCompletionBody({ model, messages, temperature }) {
+  const body = { model, messages };
+  if (isReasoningModel(model)) {
+    // Reasoning models: max_completion_tokens (no max_tokens) y sin temperature.
+    body.max_completion_tokens = 65535;
+  } else {
+    body.temperature = temperature ?? 1;
+    body.max_tokens = 65535;
+  }
+  return body;
+}
+
+/** Los modelos de razonamiento usan rol `developer` en lugar de `system`. */
+function normalizeMessagesForModel(model, messages) {
+  if (!isReasoningModel(model)) return messages;
+  return messages.map((m) =>
+    m.role === 'system' ? { role: 'developer', content: m.content } : m
+  );
+}
+
 function isConfigured(ctx) {
   return Boolean(ctx.settings?.apiKey?.trim());
 }
@@ -63,6 +89,12 @@ async function generate(ctx, { model, prompt, data, temperature }) {
   const messages = [];
   if (prompt?.trim()) messages.push({ role: 'system', content: prompt });
   messages.push({ role: 'user', content: data || '' });
+  const requestMessages = normalizeMessagesForModel(model, messages);
+  const body = buildChatCompletionBody({
+    model,
+    messages: requestMessages,
+    temperature,
+  });
 
   try {
     const res = await fetchWithTimeout(`${BASE_URL}/chat/completions`, {
@@ -71,12 +103,7 @@ async function generate(ctx, { model, prompt, data, temperature }) {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({
-        model,
-        messages,
-        temperature: temperature ?? 1,
-        max_tokens: 65535,
-      }),
+      body: JSON.stringify(body),
     }, {
       timeoutMs: GENERATE_TIMEOUT_MS,
       providerId: 'openai',
@@ -112,6 +139,8 @@ module.exports = {
   authType: 'apiKey',
   fallbackModels,
   isConfigured,
+  isReasoningModel,
+  buildChatCompletionBody,
   listModels,
   generate,
 };
