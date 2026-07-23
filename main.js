@@ -205,11 +205,22 @@ ipcMain.handle('providers:save-key', (_, { providerId, apiKey, groupId }) => {
     }
     if (providerId === 'gemini') {
       settings.authMode = 'apiKey';
-      const credPath = getDataPath('credentials.json');
-      if (fs.existsSync(credPath)) fs.unlinkSync(credPath);
     }
 
+    // Persist API key first, then remove the SA file. Unlinking before
+    // setProviderSettings risked irreversible loss of credentials.json if the
+    // config write failed (corrupt provider-config / disk error).
     setProviderSettings(providerId, settings);
+
+    if (providerId === 'gemini') {
+      const credPath = getDataPath('credentials.json');
+      try {
+        if (fs.existsSync(credPath)) fs.unlinkSync(credPath);
+      } catch {
+        // Orphan SA is harmless once authMode is apiKey with a stored key.
+      }
+    }
+
     invalidateModelsCache(providerId);
     return { ok: true, ...buildProviderStatusEntry(getProvider(providerId)) };
   } catch (e) {
