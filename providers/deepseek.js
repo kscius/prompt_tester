@@ -3,13 +3,43 @@ const { fetchWithTimeout, LIST_MODELS_TIMEOUT_MS, GENERATE_TIMEOUT_MS } = requir
 
 const BASE_URL = 'https://api.deepseek.com';
 
+// deepseek-chat / deepseek-reasoner se deprecan el 2026-07-24; V4 Flash/Pro son los IDs actuales.
 const fallbackModels = [
-  { id: 'deepseek-chat', label: 'DeepSeek Chat' },
-  { id: 'deepseek-reasoner', label: 'DeepSeek Reasoner' },
+  { id: 'deepseek-v4-flash', label: 'DeepSeek V4 Flash' },
+  { id: 'deepseek-v4-pro', label: 'DeepSeek V4 Pro' },
 ];
 
 function isChatModel(id) {
   return /deepseek/i.test(id);
+}
+
+/** Alias legacy `deepseek-reasoner` (modo thinking de V4 Flash). */
+function isThinkingModel(modelId) {
+  const id = String(modelId ?? '').trim().toLowerCase();
+  return id === 'deepseek-reasoner' || id.endsWith('-reasoner');
+}
+
+function buildChatCompletionBody({ model, messages, temperature }) {
+  const body = {
+    model,
+    messages,
+    max_tokens: 65535,
+  };
+  // En thinking mode temperature/top_p no tienen efecto; omitirlos evita ruido y 400s legacy.
+  if (!isThinkingModel(model)) {
+    body.temperature = temperature ?? 1;
+  }
+  return body;
+}
+
+/**
+ * Preferir `content` (respuesta final). Si está vacío, usar `reasoning_content`
+ * (p. ej. CoT truncado por max_tokens antes de escribir la respuesta).
+ */
+function extractDeepSeekMessageText(message) {
+  const content = extractChatCompletionText(message?.content);
+  if (String(content).trim()) return content;
+  return extractChatCompletionText(message?.reasoning_content);
 }
 
 function isConfigured(ctx) {
@@ -60,6 +90,7 @@ async function generate(ctx, { model, prompt, data, temperature }) {
   const messages = [];
   if (prompt?.trim()) messages.push({ role: 'system', content: prompt });
   messages.push({ role: 'user', content: data || '' });
+  const body = buildChatCompletionBody({ model, messages, temperature });
 
   try {
     const res = await fetchWithTimeout(`${BASE_URL}/chat/completions`, {
@@ -68,12 +99,7 @@ async function generate(ctx, { model, prompt, data, temperature }) {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({
-        model,
-        messages,
-        temperature: temperature ?? 1,
-        max_tokens: 65535,
-      }),
+      body: JSON.stringify(body),
     }, {
       timeoutMs: GENERATE_TIMEOUT_MS,
       providerId: 'deepseek',
@@ -87,7 +113,7 @@ async function generate(ctx, { model, prompt, data, temperature }) {
 
     const json = await res.json();
     const choice = json.choices?.[0];
-    const text = extractChatCompletionText(choice?.message?.content);
+    const text = extractDeepSeekMessageText(choice?.message);
     const finishReason = choice?.finish_reason ?? null;
     const empty = rejectEmptyGenerateText(text, { providerId: 'deepseek', finishReason });
     if (empty) return empty;
@@ -109,6 +135,9 @@ module.exports = {
   authType: 'apiKey',
   fallbackModels,
   isConfigured,
+  isThinkingModel,
+  buildChatCompletionBody,
+  extractDeepSeekMessageText,
   listModels,
   generate,
 };
