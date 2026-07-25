@@ -40,8 +40,10 @@
       "mixtral-8x7b-32768": { "inputPerM": 0.24, "outputPerM": 0.24 }
     },
     "deepseek": {
-      "deepseek-chat": { "inputPerM": 0.27, "outputPerM": 1.10 },
-      "deepseek-reasoner": { "inputPerM": 0.55, "outputPerM": 2.19 }
+      "deepseek-v4-flash": { "inputPerM": 0.14, "outputPerM": 0.28 },
+      "deepseek-v4-pro": { "inputPerM": 0.435, "outputPerM": 0.87 },
+      "deepseek-chat": { "inputPerM": 0.14, "outputPerM": 0.28 },
+      "deepseek-reasoner": { "inputPerM": 0.14, "outputPerM": 0.28 }
     }
   }
 }
