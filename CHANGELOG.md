@@ -6,6 +6,7 @@ El formato sigue una idea cercana a [Keep a Changelog](https://keepachangelog.co
 
 ### Corregido
 
+- Gemini: al guardar una API key, `credentials.json` (service account) solo se elimina después de persistir la config; antes un fallo de escritura (p. ej. `provider-config.json` dañado) podía borrar el SA dejando al usuario sin credenciales.
 - OpenAI: modelos de razonamiento (`o1`, `o3-mini`, …) ya no envían `temperature` ni `max_tokens` (provocaban HTTP 400); usan `max_completion_tokens` y rol `developer` en lugar de `system`.
 - MiniMax: guardar con Group ID vacío ahora elimina el `groupId` persistido (antes el merge de config lo dejaba intacto y seguía enviándose como `Group-Id`).
 - Gemini: `credentials.json` dañado ya no se reporta como «no configurado» al listar modelos o generar; se propaga el mismo aviso de corrupción que el estado de proveedores.
