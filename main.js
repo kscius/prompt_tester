@@ -27,6 +27,7 @@ const {
   inspectCredentialsFile,
   validateServiceAccountFields,
 } = require('./providers/credentials-store');
+const { saveProviderApiKey } = require('./providers/save-provider-key');
 const {
   inspectSavedPromptsFile,
   assertSavedPromptsWritable,
@@ -191,25 +192,18 @@ ipcMain.handle('providers:save-key', (_, { providerId, apiKey, groupId }) => {
     const provider = getProvider(providerId);
     if (!provider) return { ok: false, error: `Proveedor desconocido: ${providerId}` };
 
-    const trimmed = (apiKey ?? '').trim();
-    if (!trimmed) return { ok: false, error: 'API key vacía' };
+    const saved = saveProviderApiKey({
+      providerId,
+      apiKey,
+      groupId,
+      setProviderSettings,
+      clearGeminiServiceAccount: () => {
+        const credPath = getDataPath('credentials.json');
+        if (fs.existsSync(credPath)) fs.unlinkSync(credPath);
+      },
+    });
+    if (!saved.ok) return saved;
 
-    const settings = { apiKey: trimmed };
-    // MiniMax: always apply groupId from the payload so an empty field clears
-    // a previously saved Group-Id (setProviderSettings treats null as delete).
-    if (providerId === 'minimax' && groupId !== undefined) {
-      const trimmedGroup = String(groupId ?? '').trim();
-      settings.groupId = trimmedGroup || null;
-    } else if (groupId?.trim()) {
-      settings.groupId = groupId.trim();
-    }
-    if (providerId === 'gemini') {
-      settings.authMode = 'apiKey';
-      const credPath = getDataPath('credentials.json');
-      if (fs.existsSync(credPath)) fs.unlinkSync(credPath);
-    }
-
-    setProviderSettings(providerId, settings);
     invalidateModelsCache(providerId);
     return { ok: true, ...buildProviderStatusEntry(getProvider(providerId)) };
   } catch (e) {
