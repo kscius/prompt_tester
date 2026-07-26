@@ -6,6 +6,8 @@ const LITELLM_PRICING_URL =
 
 const CACHE_FILENAME = 'pricing-cache.json';
 const REFRESH_TIMEOUT_MS = 12_000;
+/** Skip LiteLLM network refresh when cache was fetched within this window. */
+const PRICING_TTL_MS = 24 * 60 * 60 * 1000;
 
 /** @type {Map<string, string>} LiteLLM provider id → app provider id */
 const LITELLM_PROVIDER_MAP = {
@@ -173,9 +175,31 @@ async function fetchLiteLLMPricing() {
   }
 }
 
-async function refreshPricingOnOpen() {
+function isPricingCacheFresh(fetchedAt, now = Date.now()) {
+  if (!fetchedAt) return false;
+  const ts = Date.parse(fetchedAt);
+  if (!Number.isFinite(ts)) return false;
+  const age = now - ts;
+  return age >= 0 && age < PRICING_TTL_MS;
+}
+
+/**
+ * Refresh pricing from LiteLLM unless the on-disk/in-memory cache is still within TTL.
+ * @param {{ force?: boolean }} [options]
+ * @returns {Promise<{ ok: boolean, skipped?: boolean, error?: string } & ReturnType<typeof getPricingStatus>>}
+ */
+async function refreshPricingOnOpen(options = {}) {
+  const force = options?.force === true;
   const bundled = loadBundledDefaults();
   const previous = pricingState;
+
+  if (!force && isPricingCacheFresh(pricingState?.fetchedAt)) {
+    console.info(
+      '[pricing] Caché de precios vigente (TTL 24h), se omite fetch:',
+      pricingState.fetchedAt
+    );
+    return { ok: true, skipped: true, ...getPricingStatus() };
+  }
 
   try {
     const remote = await fetchLiteLLMPricing();
@@ -289,4 +313,6 @@ module.exports = {
   calcCost,
   findModelRate,
   getPricingStatus,
+  isPricingCacheFresh,
+  PRICING_TTL_MS,
 };

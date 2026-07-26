@@ -232,7 +232,7 @@ ipcMain.handle('providers:clear', (_, providerId) => {
 
 ipcMain.handle('pricing:status', () => getPricingStatus());
 
-ipcMain.handle('pricing:refresh', async () => refreshPricingOnOpen());
+ipcMain.handle('pricing:refresh', async () => refreshPricingOnOpen({ force: true }));
 
 // ---------------------------------------------------------------------------
 // Legacy credentials IPC (Gemini service account)
