@@ -1,6 +1,11 @@
 const { formatHttpError } = require('./errors');
 const { fetchWithTimeout, LIST_MODELS_TIMEOUT_MS, GENERATE_TIMEOUT_MS } = require('./http');
-const { inspectCredentialsFile, CORRUPT_ERROR } = require('./credentials-store');
+const {
+  inspectCredentialsFile,
+  isValidServiceAccount,
+  validateServiceAccountFields,
+  CORRUPT_ERROR,
+} = require('./credentials-store');
 
 const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 
@@ -41,11 +46,14 @@ function inspectServiceAccountCredentials(ctx) {
   return { ok: true, creds: raw, corrupt: false };
 }
 
-/** Prefer this over a generic "not configured" when credentials.json is unreadable. */
+/** Prefer this over a generic "not configured" when credentials.json is unreadable or incomplete. */
 function getConfigurationError(ctx) {
   if (usesApiKey(ctx)) return null;
   const inspection = inspectServiceAccountCredentials(ctx);
   if (inspection.corrupt) return inspection.error ?? CORRUPT_ERROR;
+  if (inspection.creds && !isValidServiceAccount(inspection.creds)) {
+    return validateServiceAccountFields(inspection.creds) ?? 'credentials.json no es un Service Account válido.';
+  }
   return null;
 }
 
@@ -53,7 +61,7 @@ function isConfigured(ctx) {
   if (usesApiKey(ctx)) return Boolean(ctx.settings?.apiKey?.trim());
   const inspection = inspectServiceAccountCredentials(ctx);
   if (inspection.corrupt) return false;
-  return Boolean(inspection.creds?.type === 'service_account');
+  return isValidServiceAccount(inspection.creds);
 }
 
 async function getServiceAccountAccessToken(ctx) {
@@ -65,6 +73,12 @@ async function getServiceAccountAccessToken(ctx) {
     const creds = inspection.creds;
     if (!creds) {
       return { ok: false, error: 'Sin credenciales configuradas. Configúralas en el botón de credenciales.' };
+    }
+    if (!isValidServiceAccount(creds)) {
+      return {
+        ok: false,
+        error: validateServiceAccountFields(creds) ?? 'credentials.json no es un Service Account válido.',
+      };
     }
 
     const { GoogleAuth } = await import('google-auth-library');
