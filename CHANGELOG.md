@@ -6,6 +6,7 @@ El formato sigue una idea cercana a [Keep a Changelog](https://keepachangelog.co
 
 ### Corregido
 
+- Gemini: un `credentials.json` con solo `"type":"service_account"` (sin `private_key`/`client_email`) ya no se considera configurado; se usa `isValidServiceAccount` y se muestra el error de campos faltantes.
 - Gemini: al guardar una API key, `credentials.json` (service account) solo se elimina después de persistir la config; antes un fallo de escritura (p. ej. `provider-config.json` dañado) podía borrar el SA dejando al usuario sin credenciales.
 - DeepSeek: modelos de respaldo actualizados a `deepseek-v4-flash` / `deepseek-v4-pro` (los alias `deepseek-chat` / `deepseek-reasoner` se deprecán el 2026-07-24); se usa `reasoning_content` si `content` viene vacío y se omite `temperature` en `deepseek-reasoner`.
 - OpenAI: modelos de razonamiento (`o1`, `o3-mini`, …) ya no envían `temperature` ni `max_tokens` (provocaban HTTP 400); usan `max_completion_tokens` y rol `developer` en lugar de `system`.

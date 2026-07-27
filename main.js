@@ -25,6 +25,7 @@ const {
 } = require('./providers/pricing');
 const {
   inspectCredentialsFile,
+  isValidServiceAccount,
   validateServiceAccountFields,
 } = require('./providers/credentials-store');
 const { saveProviderApiKey } = require('./providers/save-provider-key');
@@ -139,12 +140,19 @@ function buildProviderStatusEntry(provider) {
       entry.error = inspection.error;
     } else {
       const creds = inspection.creds;
-      if (creds?.type === 'service_account' && !settings.apiKey?.trim()) {
+      if (isValidServiceAccount(creds) && !settings.apiKey?.trim()) {
         entry.configured = true;
         entry.authMode = 'service-account';
         entry.projectId = creds.project_id;
         entry.clientEmail = creds.client_email;
         entry.maskedKey = creds.project_id ?? maskApiKey(creds.client_email ?? '');
+      } else if (creds && !settings.apiKey?.trim()) {
+        // Readable but incomplete/invalid SA must not look "configured".
+        const fieldError = validateServiceAccountFields(creds);
+        if (fieldError) {
+          entry.configured = false;
+          entry.error = fieldError;
+        }
       }
     }
   }

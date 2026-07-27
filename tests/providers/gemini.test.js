@@ -156,6 +156,31 @@ describe('providers/gemini service-account credentials', () => {
     assert.equal(gemini.getConfigurationError(ctxValid), null);
   });
 
+  it('is not configured when SA JSON only has type (missing private_key/client_email)', () => {
+    const ctxIncomplete = {
+      ...saCtxBase,
+      readJSON: () => ({ type: 'service_account' }),
+      fileExists: () => true,
+    };
+
+    assert.equal(gemini.isConfigured(ctxIncomplete), false);
+    assert.match(gemini.getConfigurationError(ctxIncomplete), /private_key/);
+  });
+
+  it('is not configured when SA JSON is missing client_email', () => {
+    const ctxNoEmail = {
+      ...saCtxBase,
+      readJSON: () => ({
+        type: 'service_account',
+        private_key: 'key',
+      }),
+      fileExists: () => true,
+    };
+
+    assert.equal(gemini.isConfigured(ctxNoEmail), false);
+    assert.match(gemini.getConfigurationError(ctxNoEmail), /client_email/);
+  });
+
   it('remains configured for valid SA when fileExists is omitted (legacy ctx)', () => {
     const ctxLegacy = {
       ...saCtxBase,
@@ -169,5 +194,23 @@ describe('providers/gemini service-account credentials', () => {
 
     assert.equal(gemini.isConfigured(ctxLegacy), true);
     assert.equal(gemini.getConfigurationError(ctxLegacy), null);
+  });
+
+  it('getServiceAccountAccessToken rejects incomplete SA before GoogleAuth', async () => {
+    const ctxIncomplete = {
+      ...saCtxBase,
+      readJSON: () => ({ type: 'service_account' }),
+      fileExists: () => true,
+    };
+
+    const result = await gemini.generate(ctxIncomplete, {
+      model: 'gemini-2.5-flash',
+      prompt: '',
+      data: 'hi',
+      temperature: 1,
+    });
+
+    assert.equal(result.ok, false);
+    assert.match(result.error, /private_key/);
   });
 });
