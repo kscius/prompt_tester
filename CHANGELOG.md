@@ -4,6 +4,10 @@ El formato sigue una idea cercana a [Keep a Changelog](https://keepachangelog.co
 
 ## [Unreleased]
 
+### Seguridad
+
+- El historial y el Prompt Coach sanitizan el HTML de Markdown con DOMPurify (vendored) antes de `innerHTML`. Sin sanitizer disponible, se muestra texto escapado en lugar del HTML crudo de marked.
+
 ### Corregido
 
 - Gemini: un `credentials.json` con solo `"type":"service_account"` (sin `private_key`/`client_email`) ya no se considera configurado; se usa `isValidServiceAccount` y se muestra el error de campos faltantes.

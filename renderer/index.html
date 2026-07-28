@@ -9,6 +9,9 @@
   <link rel="stylesheet" href="styles.css">
   <!-- marked for Markdown rendering – using v9 UMD build for script-tag compatibility -->
   <script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
+  <!-- DOMPurify (vendored) — sanitize marked HTML before innerHTML -->
+  <script src="vendor/purify.min.js"></script>
+  <script src="md-safe.js"></script>
 </head>
 <body>
 

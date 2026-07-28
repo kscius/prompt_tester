@@ -77,13 +77,15 @@ Opcional. Máximo dos bloques \`\`\`text con etiqueta clara: \`**Sistema (sugeri
   }
 
   function mdToHtml(text) {
-    try {
-      return (window.marked && typeof window.marked.parse === 'function')
-        ? window.marked.parse(text)
-        : `<pre style="white-space:pre-wrap;word-break:break-word">${esc(text)}</pre>`;
-    } catch {
-      return `<pre style="white-space:pre-wrap;word-break:break-word">${esc(text)}</pre>`;
-    }
+    return window.renderMarkdownSafe(text, {
+      parse: window.marked && typeof window.marked.parse === 'function'
+        ? (t) => window.marked.parse(t)
+        : null,
+      sanitize: window.DOMPurify && typeof window.DOMPurify.sanitize === 'function'
+        ? (html) => window.DOMPurify.sanitize(html)
+        : null,
+      escapeHtml: esc,
+    });
   }
 
   function pt() {
