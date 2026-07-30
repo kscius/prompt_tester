@@ -1231,9 +1231,15 @@ function fmtTime(date) {
 function toast(msg) {
   document.querySelector('.toast')?.remove();
   const el = document.createElement('div');
-  el.className   = 'toast';
-  el.textContent = msg;
+  el.className = 'toast';
+  el.setAttribute('role', 'status');
+  el.setAttribute('aria-live', 'polite');
+  el.setAttribute('aria-atomic', 'true');
+  // Insert empty first so assistive tech registers the live region, then set text.
   document.body.appendChild(el);
+  requestAnimationFrame(() => {
+    el.textContent = msg;
+  });
   setTimeout(() => el.remove(), 2700);
 }
 
