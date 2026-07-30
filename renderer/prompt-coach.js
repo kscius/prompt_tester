@@ -241,12 +241,19 @@ ${userLine}`;
       return;
     }
 
-    const status = typeof window.api.getProvidersStatus === 'function'
-      ? await window.api.getProvidersStatus()
-      : await window.api.getCredsStatus().then(legacy => ({
-          activeProvider: 'gemini',
-          providers: { gemini: legacy.ok ? { configured: true } : { configured: false } },
-        }));
+    let status;
+    try {
+      status = typeof window.api.getProvidersStatus === 'function'
+        ? await window.api.getProvidersStatus()
+        : await window.api.getCredsStatus().then(legacy => ({
+            activeProvider: 'gemini',
+            providers: { gemini: legacy.ok ? { configured: true } : { configured: false } },
+          }));
+    } catch (err) {
+      console.error('[sendCoachRequest] providers:status', err);
+      p.toast(`No se pudo verificar la configuración: ${err?.message ?? err}`);
+      return;
+    }
 
     const provider = p.getActiveProviderId?.() ?? p.providerSelect?.value ?? status.activeProvider ?? 'gemini';
     if (status.configCorrupt) {
@@ -255,6 +262,11 @@ ${userLine}`;
       return;
     }
     const pinfo = status.providers?.[provider];
+    if (pinfo?.credentialsCorrupt) {
+      p.toast(pinfo.error ?? 'credentials.json está dañado. Reimporta el Service Account.');
+      p.openCredsModal(provider);
+      return;
+    }
     if (!pinfo?.configured && !pinfo?.ok) {
       p.toast('Configura la API key del proveedor primero');
       p.openCredsModal(provider);
