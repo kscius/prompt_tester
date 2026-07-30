@@ -4,6 +4,10 @@ El formato sigue una idea cercana a [Keep a Changelog](https://keepachangelog.co
 
 ## [Unreleased]
 
+### Accesibilidad
+
+- Los toasts de la UI anuncian su mensaje a lectores de pantalla (`role="status"`, `aria-live="polite"`, `aria-atomic="true"`), insertando el nodo vacío antes del texto para que la región live se registre correctamente.
+
 ### Seguridad
 
 - El historial y el Prompt Coach sanitizan el HTML de Markdown con DOMPurify (vendored) antes de `innerHTML`. Sin sanitizer disponible, se muestra texto escapado en lugar del HTML crudo de marked.
