@@ -4,6 +4,10 @@ El formato sigue una idea cercana a [Keep a Changelog](https://keepachangelog.co
 
 ## [Unreleased]
 
+### Corregido
+
+- Cargar un preset sin respuestas (o sin campo `responses`) ahora limpia el historial de salida. Antes se dejaban visibles/exportables las respuestas del preset anterior y podían guardarse por error en el preset recién cargado.
+
 ### Accesibilidad
 
 - Los toasts de la UI anuncian su mensaje a lectores de pantalla (`role="status"`, `aria-live="polite"`, `aria-atomic="true"`), insertando el nodo vacío antes del texto para que la región live se registre correctamente.

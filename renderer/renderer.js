@@ -763,11 +763,19 @@ async function loadPreset(name) {
     tempValue.textContent = parseFloat(p.temperature).toFixed(1);
   }
 
+  // Always replace history from the preset. Otherwise loading a preset without
+  // responses keeps the previous preset's output visible/exportable and can
+  // save that stale history into the newly loaded preset.
+  responseHistory.length = 0;
   if (Array.isArray(p.responses) && p.responses.length) {
-    responseHistory.length = 0;
     responseHistory.push(...p.responses);
-    renderHistory();
+    lastRawText = responseHistory[responseHistory.length - 1].text ?? '';
+  } else {
+    lastRawText = '';
+    costInfo.textContent = '';
+    outputMeta.classList.add('hidden');
   }
+  renderHistory();
 
   toast(`Cargado: ${name}`);
 }
