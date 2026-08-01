@@ -182,4 +182,16 @@ describe('providers/registry callProvider', () => {
     assert.equal(result.ok, false);
     assert.equal(result.error, 'Rate limit exceeded');
   });
+
+  it('returns structured error when generate throws', async () => {
+    groq.isConfigured = () => true;
+    groq.generate = async () => {
+      throw new Error('network exploded');
+    };
+
+    const result = await callProvider('groq', { model: 'llama', prompt: 'hi' }, noopIO.getDataPath, noopIO.readJSON);
+
+    assert.equal(result.ok, false);
+    assert.equal(result.error, 'network exploded');
+  });
 });

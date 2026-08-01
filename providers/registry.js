@@ -123,7 +123,13 @@ async function callProvider(providerId, args, getDataPath, readJSON, fileExists)
     return { ok: false, error: 'Proveedor no configurado.' };
   }
 
-  return provider.generate(ctx, args);
+  try {
+    return await provider.generate(ctx, args);
+  } catch (e) {
+    const message = e?.message || 'Error inesperado del proveedor.';
+    console.error(`[registry] generate falló para ${providerId}:`, e);
+    return { ok: false, error: message };
+  }
 }
 
 module.exports = {
