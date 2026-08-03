@@ -14,6 +14,7 @@ El formato sigue una idea cercana a [Keep a Changelog](https://keepachangelog.co
 
 ### Corregido
 
+- OpenAI, Groq, DeepSeek, Mistral y MiniMax: cuando el modelo rechaza la solicitud (`message.refusal` o partes `type: "refusal"` con `content` vacío), ahora se muestra el texto del rechazo en lugar del error genérico «no devolvió texto».
 - Prompt Coach: el preflight al enviar ahora captura fallos de `providers:status` y distingue `credentialsCorrupt` (mismo aviso que el envío principal), en lugar de rechazos no capturados o el toast genérico de «configura la API key».
 - Gemini: un `credentials.json` con solo `"type":"service_account"` (sin `private_key`/`client_email`) ya no se considera configurado; se usa `isValidServiceAccount` y se muestra el error de campos faltantes.
 - Gemini: al guardar una API key, `credentials.json` (service account) solo se elimina después de persistir la config; antes un fallo de escritura (p. ej. `provider-config.json` dañado) podía borrar el SA dejando al usuario sin credenciales.

@@ -6,6 +6,7 @@ const {
   emptyGenerateTextError,
   rejectEmptyGenerateText,
   extractChatCompletionText,
+  extractChatCompletionMessage,
 } = require('../../providers/errors');
 
 describe('providers/errors', () => {
@@ -91,6 +92,49 @@ describe('providers/errors', () => {
       assert.equal(extractChatCompletionText({ text: 'x' }), '');
       assert.equal(extractChatCompletionText([]), '');
       assert.equal(extractChatCompletionText([{ type: 'image_url', image_url: {} }]), '');
+    });
+
+    it('extracts refusal parts from content arrays', () => {
+      assert.equal(
+        extractChatCompletionText([{ type: 'refusal', refusal: 'No puedo ayudar con eso.' }]),
+        'No puedo ayudar con eso.',
+      );
+    });
+  });
+
+  describe('extractChatCompletionMessage', () => {
+    it('prefers content over refusal and reasoning_content', () => {
+      assert.equal(
+        extractChatCompletionMessage({
+          content: 'respuesta',
+          refusal: 'rechazo',
+          reasoning_content: 'pensamiento',
+        }),
+        'respuesta',
+      );
+    });
+
+    it('falls back to top-level refusal when content is empty', () => {
+      assert.equal(
+        extractChatCompletionMessage({ content: null, refusal: 'Lo siento, no puedo.' }),
+        'Lo siento, no puedo.',
+      );
+    });
+
+    it('falls back to reasoning_content when content and refusal are empty', () => {
+      assert.equal(
+        extractChatCompletionMessage({ content: '', reasoning_content: 'CoT parcial' }),
+        'CoT parcial',
+      );
+    });
+
+    it('extracts refusal parts when content is an array', () => {
+      assert.equal(
+        extractChatCompletionMessage({
+          content: [{ type: 'refusal', refusal: 'Solicitud rechazada.' }],
+        }),
+        'Solicitud rechazada.',
+      );
     });
   });
 

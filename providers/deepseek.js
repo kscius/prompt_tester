@@ -1,4 +1,4 @@
-const { formatHttpError, rejectEmptyGenerateText, extractChatCompletionText } = require('./errors');
+const { formatHttpError, rejectEmptyGenerateText, extractChatCompletionMessage } = require('./errors');
 const { fetchWithTimeout, LIST_MODELS_TIMEOUT_MS, GENERATE_TIMEOUT_MS } = require('./http');
 
 const BASE_URL = 'https://api.deepseek.com';
@@ -32,14 +32,9 @@ function buildChatCompletionBody({ model, messages, temperature }) {
   return body;
 }
 
-/**
- * Preferir `content` (respuesta final). Si está vacío, usar `reasoning_content`
- * (p. ej. CoT truncado por max_tokens antes de escribir la respuesta).
- */
+/** @deprecated Use extractChatCompletionMessage from ./errors */
 function extractDeepSeekMessageText(message) {
-  const content = extractChatCompletionText(message?.content);
-  if (String(content).trim()) return content;
-  return extractChatCompletionText(message?.reasoning_content);
+  return extractChatCompletionMessage(message);
 }
 
 function isConfigured(ctx) {
