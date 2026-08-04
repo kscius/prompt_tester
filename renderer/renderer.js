@@ -808,6 +808,12 @@ function isTempHelpOpen() {
   return !tempHelpPopover.classList.contains('hidden');
 }
 
+function isBlockingOverlayOpen() {
+  return !credsModal.classList.contains('hidden')
+    || isTempHelpOpen()
+    || (typeof window.__promptCoachIsOpen === 'function' && window.__promptCoachIsOpen());
+}
+
 function positionTempHelp() {
   const btn = tempHelpBtn.getBoundingClientRect();
   const pad = 12;
@@ -1031,6 +1037,7 @@ sendBtn.addEventListener('click', sendRequest);
 
 document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    if (isBlockingOverlayOpen()) return;
     e.preventDefault();
     sendRequest();
   }

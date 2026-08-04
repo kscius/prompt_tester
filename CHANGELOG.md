@@ -10,6 +10,7 @@ El formato sigue una idea cercana a [Keep a Changelog](https://keepachangelog.co
 
 ### Accesibilidad
 
+- Ctrl/Cmd+Enter ya no dispara el envío principal mientras el modal de credenciales, el panel del Prompt Coach o la ayuda de temperatura están abiertos (evita llamadas LLM accidentales detrás de un overlay).
 - Los toasts de la UI anuncian su mensaje a lectores de pantalla (`role="status"`, `aria-live="polite"`, `aria-atomic="true"`), insertando el nodo vacío antes del texto para que la región live se registre correctamente.
 
 ### Seguridad

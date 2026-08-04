@@ -120,6 +120,8 @@ Opcional. Máximo dos bloques \`\`\`text con etiqueta clara: \`**Sistema (sugeri
     return true;
   };
 
+  window.__promptCoachIsOpen = isCoachPanelOpen;
+
   function truncCtx(s) {
     if (s == null || s === '') return '';
     const t = String(s);
