@@ -105,6 +105,9 @@ function buildProviderCtx(providerId) {
 // ---------------------------------------------------------------------------
 
 function enrichResultWithCost(providerId, model, result) {
+  if (!result || typeof result !== 'object') {
+    return { ok: false, error: 'Respuesta inválida del proveedor.' };
+  }
   if (!result.ok || result.cost != null) return result;
   const usage = result.usage;
   if (!usage) return result;
@@ -263,13 +266,18 @@ ipcMain.handle('creds:status', () => {
 });
 
 ipcMain.handle('creds:select-file', async () => {
-  const { filePaths, canceled } = await dialog.showOpenDialog({
-    title: 'Seleccionar Service Account JSON',
-    filters: [{ name: 'JSON', extensions: ['json'] }],
-    properties: ['openFile'],
-  });
-  if (canceled || !filePaths?.[0]) return { ok: false };
-  return saveCredentialsFromFile(filePaths[0]);
+  try {
+    const { filePaths, canceled } = await dialog.showOpenDialog({
+      title: 'Seleccionar Service Account JSON',
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+      properties: ['openFile'],
+    });
+    if (canceled || !filePaths?.[0]) return { ok: false };
+    return saveCredentialsFromFile(filePaths[0]);
+  } catch (e) {
+    console.error('[creds:select-file]', e);
+    return { ok: false, error: e?.message || 'No se pudo abrir el diálogo de archivos.' };
+  }
 });
 
 ipcMain.handle('creds:save-json', (_, jsonStr) => {
@@ -338,14 +346,24 @@ ipcMain.handle('models:list', (_, providerId) => {
 // ---------------------------------------------------------------------------
 
 ipcMain.handle('llm:call', async (_, { provider, model, prompt, data, temperature }) => {
-  const providerId = provider || getActiveProviderId();
-  const result = await callProvider(providerId, { model, prompt, data, temperature }, getDataPath, readJSON, fs.existsSync);
-  return enrichResultWithCost(providerId, model, result);
+  try {
+    const providerId = provider || getActiveProviderId();
+    const result = await callProvider(providerId, { model, prompt, data, temperature }, getDataPath, readJSON, fs.existsSync);
+    return enrichResultWithCost(providerId, model, result);
+  } catch (e) {
+    console.error('[llm:call]', e);
+    return { ok: false, error: e?.message || 'Error inesperado al llamar al proveedor.' };
+  }
 });
 
 ipcMain.handle('gemini:call', async (_, args) => {
-  const result = await callProvider('gemini', args, getDataPath, readJSON, fs.existsSync);
-  return enrichResultWithCost('gemini', args.model, result);
+  try {
+    const result = await callProvider('gemini', args, getDataPath, readJSON, fs.existsSync);
+    return enrichResultWithCost('gemini', args?.model, result);
+  } catch (e) {
+    console.error('[gemini:call]', e);
+    return { ok: false, error: e?.message || 'Error inesperado al llamar a Gemini.' };
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -353,20 +371,21 @@ ipcMain.handle('gemini:call', async (_, args) => {
 // ---------------------------------------------------------------------------
 
 ipcMain.handle('output:save-file', async (_, { text, defaultName }) => {
-  const { filePath, canceled } = await dialog.showSaveDialog({
-    title: 'Guardar resultado',
-    defaultPath: defaultName ?? 'resultado.md',
-    filters: [
-      { name: 'Markdown', extensions: ['md'] },
-      { name: 'Texto', extensions: ['txt'] },
-    ],
-  });
-  if (canceled || !filePath) return { ok: false };
   try {
+    const { filePath, canceled } = await dialog.showSaveDialog({
+      title: 'Guardar resultado',
+      defaultPath: defaultName ?? 'resultado.md',
+      filters: [
+        { name: 'Markdown', extensions: ['md'] },
+        { name: 'Texto', extensions: ['txt'] },
+      ],
+    });
+    if (canceled || !filePath) return { ok: false };
     fs.writeFileSync(filePath, text, 'utf-8');
     return { ok: true, filePath };
   } catch (e) {
-    return { ok: false, error: e.message };
+    console.error('[output:save-file]', e);
+    return { ok: false, error: e?.message || 'No se pudo guardar el archivo.' };
   }
 });
 

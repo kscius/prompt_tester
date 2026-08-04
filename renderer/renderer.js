@@ -597,7 +597,14 @@ async function clearProviderKey(providerId) {
 }
 
 async function importServiceAccountFile() {
-  const result = await window.api.selectCredsFile();
+  let result;
+  try {
+    result = await window.api.selectCredsFile();
+  } catch (e) {
+    console.error('[importServiceAccountFile]', e);
+    toast(`Error: ${e?.message || 'No se pudo abrir el selector de archivos.'}`);
+    return;
+  }
   if (result?.ok) {
     credentialsCorruptNotified = false;
     try {
@@ -1051,9 +1058,14 @@ exportBtn.addEventListener('click', async () => {
     .join('\n\n---\n\n');
   const ts   = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const name = `historial-${ts}.md`;
-  const res  = await window.api.saveOutputFile({ text: all, defaultName: name });
-  if (res.ok)         toast(`Guardado: ${res.filePath.split(/[\\/]/).pop()}`);
-  else if (res.error) toast(`Error: ${res.error}`);
+  try {
+    const res = await window.api.saveOutputFile({ text: all, defaultName: name });
+    if (res.ok)         toast(`Guardado: ${res.filePath.split(/[\\/]/).pop()}`);
+    else if (res.error) toast(`Error: ${res.error}`);
+  } catch (e) {
+    console.error('[export]', e);
+    toast(`Error: ${e?.message || 'No se pudo exportar el historial.'}`);
+  }
 });
 
 clearOutputBtn.addEventListener('click', () => {
