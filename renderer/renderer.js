@@ -597,7 +597,14 @@ async function clearProviderKey(providerId) {
 }
 
 async function importServiceAccountFile() {
-  const result = await window.api.selectCredsFile();
+  let result;
+  try {
+    result = await window.api.selectCredsFile();
+  } catch (e) {
+    console.error('[importServiceAccountFile]', e);
+    toast(`Error: ${e?.message || 'No se pudo abrir el selector de archivos.'}`);
+    return;
+  }
   if (result?.ok) {
     credentialsCorruptNotified = false;
     try {
@@ -763,11 +770,19 @@ async function loadPreset(name) {
     tempValue.textContent = parseFloat(p.temperature).toFixed(1);
   }
 
+  // Always replace history from the preset. Otherwise loading a preset without
+  // responses keeps the previous preset's output visible/exportable and can
+  // save that stale history into the newly loaded preset.
+  responseHistory.length = 0;
   if (Array.isArray(p.responses) && p.responses.length) {
-    responseHistory.length = 0;
     responseHistory.push(...p.responses);
-    renderHistory();
+    lastRawText = responseHistory[responseHistory.length - 1].text ?? '';
+  } else {
+    lastRawText = '';
+    costInfo.textContent = '';
+    outputMeta.classList.add('hidden');
   }
+  renderHistory();
 
   toast(`Cargado: ${name}`);
 }
@@ -791,6 +806,12 @@ tempRange.addEventListener('input', () => {
 // ─── Ayuda de temperatura ───────────────────────────────────────────────────
 function isTempHelpOpen() {
   return !tempHelpPopover.classList.contains('hidden');
+}
+
+function isBlockingOverlayOpen() {
+  return !credsModal.classList.contains('hidden')
+    || isTempHelpOpen()
+    || (typeof window.__promptCoachIsOpen === 'function' && window.__promptCoachIsOpen());
 }
 
 function positionTempHelp() {
@@ -1016,6 +1037,7 @@ sendBtn.addEventListener('click', sendRequest);
 
 document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    if (isBlockingOverlayOpen()) return;
     e.preventDefault();
     sendRequest();
   }
@@ -1043,9 +1065,14 @@ exportBtn.addEventListener('click', async () => {
     .join('\n\n---\n\n');
   const ts   = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const name = `historial-${ts}.md`;
-  const res  = await window.api.saveOutputFile({ text: all, defaultName: name });
-  if (res.ok)         toast(`Guardado: ${res.filePath.split(/[\\/]/).pop()}`);
-  else if (res.error) toast(`Error: ${res.error}`);
+  try {
+    const res = await window.api.saveOutputFile({ text: all, defaultName: name });
+    if (res.ok)         toast(`Guardado: ${res.filePath.split(/[\\/]/).pop()}`);
+    else if (res.error) toast(`Error: ${res.error}`);
+  } catch (e) {
+    console.error('[export]', e);
+    toast(`Error: ${e?.message || 'No se pudo exportar el historial.'}`);
+  }
 });
 
 clearOutputBtn.addEventListener('click', () => {

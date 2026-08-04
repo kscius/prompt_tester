@@ -4,8 +4,13 @@ El formato sigue una idea cercana a [Keep a Changelog](https://keepachangelog.co
 
 ## [Unreleased]
 
+### Corregido
+
+- Cargar un preset sin respuestas (o sin campo `responses`) ahora limpia el historial de salida. Antes se dejaban visibles/exportables las respuestas del preset anterior y podían guardarse por error en el preset recién cargado.
+
 ### Accesibilidad
 
+- Ctrl/Cmd+Enter ya no dispara el envío principal mientras el modal de credenciales, el panel del Prompt Coach o la ayuda de temperatura están abiertos (evita llamadas LLM accidentales detrás de un overlay).
 - Los toasts de la UI anuncian su mensaje a lectores de pantalla (`role="status"`, `aria-live="polite"`, `aria-atomic="true"`), insertando el nodo vacío antes del texto para que la región live se registre correctamente.
 
 ### Seguridad
@@ -15,6 +20,7 @@ El formato sigue una idea cercana a [Keep a Changelog](https://keepachangelog.co
 ### Corregido
 
 - OpenAI, Groq, DeepSeek, Mistral y MiniMax: cuando el modelo rechaza la solicitud (`message.refusal` o partes `type: "refusal"` con `content` vacío), ahora se muestra el texto del rechazo en lugar del error genérico «no devolvió texto».
+- LLM / export / credenciales: errores inesperados en `llm:call`, `gemini:call`, `output:save-file` y `creds:select-file` devuelven `{ ok: false, error }` en lugar de rechazar el IPC; `callProvider` captura excepciones de `generate` y la UI de exportar/importar SA muestra toast si el canal falla.
 - Prompt Coach: el preflight al enviar ahora captura fallos de `providers:status` y distingue `credentialsCorrupt` (mismo aviso que el envío principal), en lugar de rechazos no capturados o el toast genérico de «configura la API key».
 - Gemini: un `credentials.json` con solo `"type":"service_account"` (sin `private_key`/`client_email`) ya no se considera configurado; se usa `isValidServiceAccount` y se muestra el error de campos faltantes.
 - Gemini: al guardar una API key, `credentials.json` (service account) solo se elimina después de persistir la config; antes un fallo de escritura (p. ej. `provider-config.json` dañado) podía borrar el SA dejando al usuario sin credenciales.
