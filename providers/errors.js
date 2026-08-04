@@ -110,9 +110,33 @@ function extractChatCompletionText(content) {
       if (typeof part !== 'object') return '';
       if (typeof part.text === 'string') return part.text;
       if (typeof part.content === 'string') return part.content;
+      if (typeof part.refusal === 'string') return part.refusal;
       return '';
     })
     .join('');
+}
+
+/**
+ * Extract usable text from an OpenAI-compatible chat completion message.
+ * Handles content arrays (incl. refusal parts), top-level `refusal`, and
+ * DeepSeek-style `reasoning_content` when `content` is empty.
+ * @param {unknown} message
+ * @returns {string}
+ */
+function extractChatCompletionMessage(message) {
+  if (!message || typeof message !== 'object') return '';
+
+  const content = extractChatCompletionText(message.content);
+  if (String(content).trim()) return content;
+
+  if (typeof message.refusal === 'string' && message.refusal.trim()) {
+    return message.refusal;
+  }
+
+  const reasoning = extractChatCompletionText(message.reasoning_content);
+  if (String(reasoning).trim()) return reasoning;
+
+  return '';
 }
 
 /**
@@ -132,4 +156,5 @@ module.exports = {
   emptyGenerateTextError,
   rejectEmptyGenerateText,
   extractChatCompletionText,
+  extractChatCompletionMessage,
 };

@@ -138,5 +138,51 @@ for (const { id, mod } of providers) {
       assert.equal(result.ok, false);
       assert.equal(result.error, `${id} no devolvió texto (finishReason: stop).`);
     });
+
+    it('returns ok:true with refusal text when content is null', async () => {
+      globalThis.fetch = async () =>
+        mockOkJson({
+          choices: [
+            {
+              message: { content: null, refusal: 'No puedo cumplir esa solicitud.' },
+              finish_reason: 'stop',
+            },
+          ],
+        });
+
+      const result = await mod.generate(ctx, {
+        model: 'test-model',
+        prompt: '',
+        data: 'hi',
+        temperature: 1,
+      });
+
+      assert.equal(result.ok, true);
+      assert.equal(result.text, 'No puedo cumplir esa solicitud.');
+    });
+
+    it('returns ok:true with refusal parts in content array', async () => {
+      globalThis.fetch = async () =>
+        mockOkJson({
+          choices: [
+            {
+              message: {
+                content: [{ type: 'refusal', refusal: 'Contenido no permitido.' }],
+              },
+              finish_reason: 'stop',
+            },
+          ],
+        });
+
+      const result = await mod.generate(ctx, {
+        model: 'test-model',
+        prompt: '',
+        data: 'hi',
+        temperature: 1,
+      });
+
+      assert.equal(result.ok, true);
+      assert.equal(result.text, 'Contenido no permitido.');
+    });
   });
 }
