@@ -4,6 +4,8 @@ El formato sigue una idea cercana a [Keep a Changelog](https://keepachangelog.co
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-08-05
+
 ### Corregido
 
 - Cargar un preset sin respuestas (o sin campo `responses`) ahora limpia el historial de salida. Antes se dejaban visibles/exportables las respuestas del preset anterior y podían guardarse por error en el preset recién cargado.
@@ -75,7 +77,8 @@ El formato sigue una idea cercana a [Keep a Changelog](https://keepachangelog.co
 - Empaquetado con electron-builder: Windows (NSIS + portable), macOS (DMG + ZIP) y Linux (AppImage + deb).
 - Mitigaciones en Windows para conflictos de caché de Chromium y bloqueo de instancia única.
 
-[Unreleased]: https://github.com/kscius/prompt_tester/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/kscius/prompt_tester/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/kscius/prompt_tester/compare/v1.4.0...v1.5.0
 [1.3.0]: https://github.com/kscius/prompt_tester/releases/tag/v1.3.0
 [1.1.0]: https://github.com/kscius/prompt_tester/releases/tag/v1.1.0
 [1.0.0]: https://github.com/kscius/prompt_tester/releases/tag/v1.0.0
