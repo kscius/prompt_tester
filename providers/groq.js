@@ -3,6 +3,9 @@ const { fetchWithTimeout, LIST_MODELS_TIMEOUT_MS, GENERATE_TIMEOUT_MS } = requir
 
 const BASE_URL = 'https://api.groq.com/openai/v1';
 
+/** Groq rechaza max_tokens/max_completion_tokens por encima de este límite en la mayoría de modelos. */
+const GROQ_MAX_OUTPUT_TOKENS = 16_384;
+
 const fallbackModels = [
   { id: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B Versatile' },
   { id: 'llama-3.1-8b-instant', label: 'Llama 3.1 8B Instant' },
@@ -48,6 +51,15 @@ async function listModels(ctx) {
   }
 }
 
+function buildChatCompletionBody({ model, messages, temperature }) {
+  return {
+    model,
+    messages,
+    temperature: temperature ?? 1,
+    max_completion_tokens: GROQ_MAX_OUTPUT_TOKENS,
+  };
+}
+
 function mapUsage(usage) {
   if (!usage) return null;
   return {
@@ -70,12 +82,7 @@ async function generate(ctx, { model, prompt, data, temperature }) {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({
-        model,
-        messages,
-        temperature: temperature ?? 1,
-        max_tokens: 65535,
-      }),
+      body: JSON.stringify(buildChatCompletionBody({ model, messages, temperature })),
     }, {
       timeoutMs: GENERATE_TIMEOUT_MS,
       providerId: 'groq',
@@ -109,8 +116,10 @@ module.exports = {
   id: 'groq',
   label: 'Groq',
   authType: 'apiKey',
+  GROQ_MAX_OUTPUT_TOKENS,
   fallbackModels,
   isConfigured,
   listModels,
+  buildChatCompletionBody,
   generate,
 };
