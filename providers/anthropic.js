@@ -4,6 +4,25 @@ const { fetchWithTimeout, LIST_MODELS_TIMEOUT_MS, GENERATE_TIMEOUT_MS } = requir
 const BASE_URL = 'https://api.anthropic.com/v1';
 const ANTHROPIC_VERSION = '2023-06-01';
 
+/** Anthropic rechaza max_tokens por encima del límite de salida de cada modelo. */
+const ANTHROPIC_MAX_OUTPUT_TOKENS = {
+  opus3: 4_096,
+  sonnet35: 8_192,
+  extended: 64_000,
+};
+
+/**
+ * @param {string} model
+ * @returns {number}
+ */
+function getMaxOutputTokens(model) {
+  const id = String(model || '').toLowerCase();
+  if (/claude-3-opus|claude-opus-3/.test(id)) return ANTHROPIC_MAX_OUTPUT_TOKENS.opus3;
+  if (/claude-3-5-(sonnet|haiku)/.test(id)) return ANTHROPIC_MAX_OUTPUT_TOKENS.sonnet35;
+  if (/claude-(sonnet|opus)-4|claude-3-7-sonnet/.test(id)) return ANTHROPIC_MAX_OUTPUT_TOKENS.extended;
+  return ANTHROPIC_MAX_OUTPUT_TOKENS.sonnet35;
+}
+
 const fallbackModels = [
   { id: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4' },
   { id: 'claude-3-7-sonnet-20250219', label: 'Claude 3.7 Sonnet' },
@@ -71,7 +90,7 @@ async function generate(ctx, { model, prompt, data, temperature }) {
 
   const body = {
     model,
-    max_tokens: 65535,
+    max_tokens: getMaxOutputTokens(model),
     messages: [{ role: 'user', content: data || '' }],
     temperature: temperature ?? 1,
   };
@@ -121,7 +140,9 @@ module.exports = {
   id: 'anthropic',
   label: 'Anthropic',
   authType: 'apiKey',
+  ANTHROPIC_MAX_OUTPUT_TOKENS,
   fallbackModels,
+  getMaxOutputTokens,
   isConfigured,
   listModels,
   generate,
