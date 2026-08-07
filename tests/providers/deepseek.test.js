@@ -39,6 +39,24 @@ describe('providers/deepseek isThinkingModel', () => {
   });
 });
 
+describe('providers/deepseek getMaxOutputTokens', () => {
+  it('caps legacy chat and reasoner aliases at 8192', () => {
+    assert.equal(deepseek.getMaxOutputTokens('deepseek-chat'), 8192);
+    assert.equal(deepseek.getMaxOutputTokens('deepseek-reasoner'), 8192);
+    assert.equal(deepseek.getMaxOutputTokens('DeepSeek-Chat'), 8192);
+  });
+
+  it('allows 65535 for V4 models', () => {
+    assert.equal(deepseek.getMaxOutputTokens('deepseek-v4-flash'), 65_535);
+    assert.equal(deepseek.getMaxOutputTokens('deepseek-v4-pro'), 65_535);
+  });
+
+  it('defaults unknown deepseek ids to 8192', () => {
+    assert.equal(deepseek.getMaxOutputTokens('deepseek-future-model'), 8192);
+    assert.equal(deepseek.getMaxOutputTokens(''), 8192);
+  });
+});
+
 describe('providers/deepseek buildChatCompletionBody', () => {
   const messages = [{ role: 'user', content: 'hi' }];
 
@@ -61,7 +79,16 @@ describe('providers/deepseek buildChatCompletionBody', () => {
     });
     assert.equal(body.model, 'deepseek-reasoner');
     assert.equal(body.temperature, undefined);
-    assert.equal(body.max_tokens, 65535);
+    assert.equal(body.max_tokens, 8192);
+  });
+
+  it('caps max_tokens for legacy deepseek-chat', () => {
+    const body = deepseek.buildChatCompletionBody({
+      model: 'deepseek-chat',
+      messages,
+      temperature: 1,
+    });
+    assert.equal(body.max_tokens, 8192);
   });
 });
 
@@ -134,7 +161,7 @@ describe('providers/deepseek generate request body', () => {
     assert.equal(lastRequest.body.max_tokens, 65535);
   });
 
-  it('omits temperature for deepseek-reasoner', async () => {
+  it('sends capped max_tokens for deepseek-reasoner instead of 65535', async () => {
     captureFetch();
     await deepseek.generate(ctx, {
       model: 'deepseek-reasoner',
@@ -144,6 +171,7 @@ describe('providers/deepseek generate request body', () => {
     });
     assert.equal(lastRequest.body.model, 'deepseek-reasoner');
     assert.equal(lastRequest.body.temperature, undefined);
+    assert.equal(lastRequest.body.max_tokens, 8192);
   });
 });
 

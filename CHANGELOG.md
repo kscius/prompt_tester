@@ -4,6 +4,10 @@ El formato sigue una idea cercana a [Keep a Changelog](https://keepachangelog.co
 
 ## [Unreleased]
 
+### Corregido
+
+- DeepSeek: `max_tokens` ahora se limita según el modelo (8192 para alias legacy `deepseek-chat`/`deepseek-reasoner`; 65535 para V4). Antes el valor fijo 65535 provocaba HTTP 400 en modelos legacy aún listados por la API.
+
 ## [1.5.0] - 2026-08-05
 
 ### Corregido

@@ -3,6 +3,26 @@ const { fetchWithTimeout, LIST_MODELS_TIMEOUT_MS, GENERATE_TIMEOUT_MS } = requir
 
 const BASE_URL = 'https://api.deepseek.com';
 
+/** deepseek-chat / deepseek-reasoner: la API rechaza max_tokens > 8192. */
+const DEEPSEEK_LEGACY_MAX_OUTPUT_TOKENS = 8_192;
+/** V4 documenta hasta 384K de salida; 65535 es un tope práctico para el cliente. */
+const DEEPSEEK_V4_MAX_OUTPUT_TOKENS = 65_535;
+
+/**
+ * @param {string} model
+ * @returns {number}
+ */
+function getMaxOutputTokens(model) {
+  const id = String(model ?? '').trim().toLowerCase();
+  if (id === 'deepseek-chat' || id === 'deepseek-reasoner' || /^deepseek-chat/.test(id)) {
+    return DEEPSEEK_LEGACY_MAX_OUTPUT_TOKENS;
+  }
+  if (/deepseek-v4|deepseek-v\d/i.test(id)) {
+    return DEEPSEEK_V4_MAX_OUTPUT_TOKENS;
+  }
+  return DEEPSEEK_LEGACY_MAX_OUTPUT_TOKENS;
+}
+
 // deepseek-chat / deepseek-reasoner se deprecan el 2026-07-24; V4 Flash/Pro son los IDs actuales.
 const fallbackModels = [
   { id: 'deepseek-v4-flash', label: 'DeepSeek V4 Flash' },
@@ -23,7 +43,7 @@ function buildChatCompletionBody({ model, messages, temperature }) {
   const body = {
     model,
     messages,
-    max_tokens: 65535,
+    max_tokens: getMaxOutputTokens(model),
   };
   // En thinking mode temperature/top_p no tienen efecto; omitirlos evita ruido y 400s legacy.
   if (!isThinkingModel(model)) {
@@ -129,6 +149,9 @@ module.exports = {
   label: 'DeepSeek',
   authType: 'apiKey',
   fallbackModels,
+  DEEPSEEK_LEGACY_MAX_OUTPUT_TOKENS,
+  DEEPSEEK_V4_MAX_OUTPUT_TOKENS,
+  getMaxOutputTokens,
   isConfigured,
   isThinkingModel,
   buildChatCompletionBody,
