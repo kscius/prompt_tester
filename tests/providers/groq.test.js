@@ -81,6 +81,24 @@ describe('providers/groq generate request body', () => {
       { role: 'user', content: 'hi' },
     ]);
   });
+
+  it('returns ok:false with Spanish message on malformed JSON body', async () => {
+    globalThis.fetch = async () => ({
+      ok: true,
+      status: 200,
+      text: async () => 'not json',
+    });
+
+    const result = await groq.generate(ctx, {
+      model: 'llama-3.3-70b-versatile',
+      prompt: '',
+      data: 'hi',
+      temperature: 1,
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(result.error, '[groq] Respuesta inválida del proveedor (JSON malformado).');
+  });
 });
 
 describe('providers/groq listModels', () => {
@@ -132,6 +150,19 @@ describe('providers/groq listModels', () => {
         assert.match(err.message, /\[groq\]/);
         return true;
       },
+    );
+  });
+
+  it('throws Spanish error when API returns malformed JSON on HTTP 200', async () => {
+    globalThis.fetch = async () => ({
+      ok: true,
+      status: 200,
+      text: async () => '<html>bad gateway</html>',
+    });
+
+    await assert.rejects(
+      () => groq.listModels(ctx),
+      { message: '[groq] Respuesta inválida del proveedor (JSON malformado).' },
     );
   });
 });

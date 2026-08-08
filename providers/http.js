@@ -89,10 +89,59 @@ async function fetchWithTimeout(url, options = {}, meta = {}) {
   }
 }
 
+/**
+ * User-facing Spanish message when a provider returns non-JSON on HTTP 200.
+ * @param {{ providerId?: string, reason?: 'empty'|'malformed' }} [opts]
+ * @returns {string}
+ */
+function malformedJsonErrorMessage({ providerId, reason = 'malformed' } = {}) {
+  const prefix = providerId ? `[${providerId}] ` : '';
+  const detail =
+    reason === 'empty'
+      ? 'cuerpo vacío'
+      : 'JSON malformado';
+  return `${prefix}Respuesta inválida del proveedor (${detail}).`;
+}
+
+/**
+ * Parse a fetch Response body as JSON. Throws a Spanish Error on empty or invalid JSON.
+ * @param {Response} res
+ * @param {{ providerId?: string }} [opts]
+ * @returns {Promise<unknown>}
+ */
+async function parseJsonResponse(res, { providerId } = {}) {
+  if (typeof res.text === 'function') {
+    const body = await res.text();
+    if (!body.trim()) {
+      throw new Error(malformedJsonErrorMessage({ providerId, reason: 'empty' }));
+    }
+    try {
+      return JSON.parse(body);
+    } catch {
+      throw new Error(malformedJsonErrorMessage({ providerId, reason: 'malformed' }));
+    }
+  }
+
+  if (typeof res.json === 'function') {
+    try {
+      return await res.json();
+    } catch (e) {
+      if (e instanceof SyntaxError) {
+        throw new Error(malformedJsonErrorMessage({ providerId, reason: 'malformed' }));
+      }
+      throw e;
+    }
+  }
+
+  throw new Error(malformedJsonErrorMessage({ providerId, reason: 'empty' }));
+}
+
 module.exports = {
   LIST_MODELS_TIMEOUT_MS,
   GENERATE_TIMEOUT_MS,
   isAbortError,
   timeoutErrorMessage,
+  malformedJsonErrorMessage,
+  parseJsonResponse,
   fetchWithTimeout,
 };

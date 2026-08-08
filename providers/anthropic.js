@@ -1,5 +1,5 @@
 const { formatHttpError, rejectEmptyGenerateText } = require('./errors');
-const { fetchWithTimeout, LIST_MODELS_TIMEOUT_MS, GENERATE_TIMEOUT_MS } = require('./http');
+const { fetchWithTimeout, LIST_MODELS_TIMEOUT_MS, GENERATE_TIMEOUT_MS, parseJsonResponse } = require('./http');
 
 const BASE_URL = 'https://api.anthropic.com/v1';
 const ANTHROPIC_VERSION = '2023-06-01';
@@ -59,7 +59,7 @@ async function listModels(ctx) {
       throw new Error(formatHttpError(res.status, errBody, 'anthropic'));
     }
 
-    const json = await res.json();
+    const json = await parseJsonResponse(res, { providerId: 'anthropic' });
     const models = (json.data ?? [])
       .map((m) => ({
         id: m.id,
@@ -115,7 +115,7 @@ async function generate(ctx, { model, prompt, data, temperature }) {
       return { ok: false, error: formatHttpError(res.status, errBody, 'anthropic') };
     }
 
-    const json = await res.json();
+    const json = await parseJsonResponse(res, { providerId: 'anthropic' });
     const text = (json.content ?? [])
       .filter((part) => part.type === 'text')
       .map((part) => part.text || '')

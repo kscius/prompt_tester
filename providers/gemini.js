@@ -1,5 +1,5 @@
 const { formatHttpError } = require('./errors');
-const { fetchWithTimeout, LIST_MODELS_TIMEOUT_MS, GENERATE_TIMEOUT_MS } = require('./http');
+const { fetchWithTimeout, LIST_MODELS_TIMEOUT_MS, GENERATE_TIMEOUT_MS, parseJsonResponse } = require('./http');
 const {
   inspectCredentialsFile,
   isValidServiceAccount,
@@ -157,7 +157,7 @@ async function fetchAllApiModels(auth) {
       throw new Error(formatHttpError(res.status, errBody, 'gemini'));
     }
 
-    const json = await res.json();
+    const json = await parseJsonResponse(res, { providerId: 'gemini' });
     if (Array.isArray(json.models)) collected.push(...json.models);
     pageToken = json.nextPageToken;
   } while (pageToken);
@@ -271,7 +271,7 @@ async function generate(ctx, { model, prompt, data, temperature }) {
       return { ok: false, error: formatHttpError(res.status, errBody, 'gemini') };
     }
 
-    const json = await res.json();
+    const json = await parseJsonResponse(res, { providerId: 'gemini' });
     if (json.promptFeedback?.blockReason) {
       return { ok: false, error: emptyGenerateError(json, null) };
     }

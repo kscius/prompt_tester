@@ -1,5 +1,5 @@
 const { formatHttpError, rejectEmptyGenerateText, extractChatCompletionMessage } = require('./errors');
-const { fetchWithTimeout, LIST_MODELS_TIMEOUT_MS, GENERATE_TIMEOUT_MS } = require('./http');
+const { fetchWithTimeout, LIST_MODELS_TIMEOUT_MS, GENERATE_TIMEOUT_MS, parseJsonResponse } = require('./http');
 
 const BASE_URL = 'https://api.deepseek.com';
 
@@ -78,7 +78,7 @@ async function listModels(ctx) {
       throw new Error(formatHttpError(res.status, errBody, 'deepseek'));
     }
 
-    const json = await res.json();
+    const json = await parseJsonResponse(res, { providerId: 'deepseek' });
     const models = (json.data ?? [])
       .map((m) => ({ id: m.id, label: m.id }))
       .filter((m) => isChatModel(m.id))
@@ -126,7 +126,7 @@ async function generate(ctx, { model, prompt, data, temperature }) {
       return { ok: false, error: formatHttpError(res.status, errBody, 'deepseek') };
     }
 
-    const json = await res.json();
+    const json = await parseJsonResponse(res, { providerId: 'deepseek' });
     const choice = json.choices?.[0];
     const text = extractDeepSeekMessageText(choice?.message);
     const finishReason = choice?.finish_reason ?? null;
