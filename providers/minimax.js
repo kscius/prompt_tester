@@ -1,5 +1,5 @@
 const { formatHttpError, rejectEmptyGenerateText, extractChatCompletionMessage, extractChatCompletionText } = require('./errors');
-const { fetchWithTimeout, LIST_MODELS_TIMEOUT_MS, GENERATE_TIMEOUT_MS } = require('./http');
+const { fetchWithTimeout, LIST_MODELS_TIMEOUT_MS, GENERATE_TIMEOUT_MS, parseJsonResponse } = require('./http');
 
 const BASE_URL = 'https://api.minimax.chat/v1';
 
@@ -40,7 +40,7 @@ async function listModels(ctx) {
       throw new Error(formatHttpError(res.status, errBody, 'minimax'));
     }
 
-    const json = await res.json();
+    const json = await parseJsonResponse(res, { providerId: 'minimax' });
     if (json.base_resp?.status_code && json.base_resp.status_code !== 0) {
       throw new Error(json.base_resp.status_msg || `MiniMax error ${json.base_resp.status_code}`);
     }
@@ -103,7 +103,7 @@ async function generate(ctx, { model, prompt, data, temperature }) {
       return { ok: false, error: formatHttpError(res.status, errBody, 'minimax') };
     }
 
-    const json = await res.json();
+    const json = await parseJsonResponse(res, { providerId: 'minimax' });
     if (json.base_resp?.status_code && json.base_resp.status_code !== 0) {
       return {
         ok: false,

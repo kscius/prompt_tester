@@ -1,5 +1,6 @@
 const path = require('path');
 const fs = require('fs');
+const { parseJsonResponse } = require('./http');
 
 const LITELLM_PRICING_URL =
   'https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json';
@@ -168,7 +169,7 @@ async function fetchLiteLLMPricing() {
   try {
     const res = await fetch(LITELLM_PRICING_URL, { signal: controller.signal });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const raw = await res.json();
+    const raw = await parseJsonResponse(res, { providerId: 'pricing' });
     return normalizeLiteLLMCatalog(raw);
   } finally {
     clearTimeout(timer);

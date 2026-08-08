@@ -5,6 +5,8 @@ const {
   GENERATE_TIMEOUT_MS,
   isAbortError,
   timeoutErrorMessage,
+  malformedJsonErrorMessage,
+  parseJsonResponse,
   fetchWithTimeout,
 } = require('../../providers/http');
 
@@ -38,6 +40,50 @@ describe('providers/http', () => {
       assert.equal(isAbortError({ code: 'ABORT_ERR' }), true);
       assert.equal(isAbortError(new Error('network')), false);
       assert.equal(isAbortError(null), false);
+    });
+  });
+
+  describe('malformedJsonErrorMessage', () => {
+    it('formats malformed JSON with provider id', () => {
+      assert.equal(
+        malformedJsonErrorMessage({ providerId: 'openai' }),
+        '[openai] Respuesta inválida del proveedor (JSON malformado).',
+      );
+    });
+
+    it('formats empty body', () => {
+      assert.equal(
+        malformedJsonErrorMessage({ providerId: 'groq', reason: 'empty' }),
+        '[groq] Respuesta inválida del proveedor (cuerpo vacío).',
+      );
+    });
+  });
+
+  describe('parseJsonResponse', () => {
+    it('parses valid JSON from response text', async () => {
+      const res = {
+        text: async () => '{"ok":true,"data":[1,2]}',
+      };
+      const json = await parseJsonResponse(res, { providerId: 'openai' });
+      assert.deepEqual(json, { ok: true, data: [1, 2] });
+    });
+
+    it('throws Spanish error on malformed JSON', async () => {
+      const res = {
+        text: async () => '<html>gateway error</html>',
+      };
+      await assert.rejects(
+        () => parseJsonResponse(res, { providerId: 'anthropic' }),
+        { message: '[anthropic] Respuesta inválida del proveedor (JSON malformado).' },
+      );
+    });
+
+    it('throws Spanish error on empty body', async () => {
+      const res = { text: async () => '   ' };
+      await assert.rejects(
+        () => parseJsonResponse(res, { providerId: 'gemini' }),
+        { message: '[gemini] Respuesta inválida del proveedor (cuerpo vacío).' },
+      );
     });
   });
 
